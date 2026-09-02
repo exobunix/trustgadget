@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100" width="100%" height="100%">
+    <rect x="20" y="20" width="60" height="60" rx="8" fill="#eb0028"/>
+    <text x="50" y="62" font-family="system-ui, sans-serif" font-weight="900" font-size="40" fill="#ffffff" text-anchor="middle">1+</text>
+    <text x="100" y="62" font-family="system-ui, sans-serif" font-weight="800" font-size="34" fill="#ffffff">ONEPLUS</text>
+  </svg>

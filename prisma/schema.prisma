@@ -1,0 +1,410 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id          String    @id @default(cuid())
+  name        String
+  email       String    @unique
+  phone       String?
+  role        String    @default("CUSTOMER")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  orders      Order[]
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  email        String    @unique
+  passwordHash String
+  name         String
+  roleSlug     String    @default("super_admin")
+  role         Role?     @relation(fields: [roleSlug], references: [slug])
+  isActive     Boolean   @default(true)
+  avatarUrl    String?
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  auditLogs    AuditLog[]
+}
+
+model Role {
+  id          String      @id @default(cuid())
+  name        String
+  slug        String      @unique
+  description String?
+  permissions String      @default("[]") // JSON string of permission strings
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  admins      AdminUser[]
+}
+
+model Category {
+  id           String        @id @default(cuid())
+  name         String
+  slug         String        @unique
+  icon         String?
+  description  String?
+  imageUrl     String?
+  displayOrder Int           @default(0)
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  brands       Brand[]
+  models       Model[]
+  questions    Question[]
+  pricingRules PricingRule[]
+}
+
+model Brand {
+  id           String        @id @default(cuid())
+  categoryId   String
+  category     Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name         String
+  slug         String
+  logoUrl      String?
+  isPopular    Boolean       @default(false)
+  displayOrder Int           @default(0)
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  models       Model[]
+  questions    Question[]
+  pricingRules PricingRule[]
+
+  @@unique([categoryId, slug])
+}
+
+model Model {
+  id             String         @id @default(cuid())
+  brandId        String
+  brand          Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  categoryId     String
+  category       Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name           String
+  slug           String
+  series         String?
+  imageUrl       String?
+  releaseYear    Int?
+  basePrice      Float
+  minPrice       Float?
+  maxPrice       Float?
+  isPopular      Boolean        @default(false)
+  isFeatured     Boolean        @default(false)
+  isActive       Boolean        @default(true)
+  specifications String?        // JSON string of key-values
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  variants       Variant[]
+  questions      Question[]
+  pricingRules   PricingRule[]
+
+  @@unique([brandId, slug])
+}
+
+model Variant {
+  id           String        @id @default(cuid())
+  modelId      String
+  model        Model         @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  name         String
+  slug         String
+  ram          String?
+  storage      String?
+  processor    String?
+  gpu          String?
+  screenSize   String?
+  color        String?
+  basePrice    Float
+  minPrice     Float?
+  maxPrice     Float?
+  isDefault    Boolean       @default(false)
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  pricingRules PricingRule[]
+
+  @@unique([modelId, slug])
+}
+
+model Question {
+  id               String            @id @default(cuid())
+  categoryId       String?
+  category         Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  brandId          String?
+  brand            Brand?            @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  modelId          String?
+  model            Model?            @relation(fields: [modelId], references: [id], onDelete: SetNull)
+  title            String
+  subtitle         String?
+  code             String            @unique
+  questionType     String            @default("SINGLE_CHOICE") // SINGLE_CHOICE, MULTI_CHOICE, YES_NO, NUMBER, DROPDOWN
+  isRequired       Boolean           @default(true)
+  displayOrder     Int               @default(0)
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  answers          Answer[]
+  valuationAnswers ValuationAnswer[]
+}
+
+model Answer {
+  id               String            @id @default(cuid())
+  questionId       String
+  question         Question          @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  code             String
+  label            String
+  description      String?
+  icon             String?
+  adjustmentType   String            @default("FIXED") // FIXED, PERCENTAGE
+  adjustmentValue  Float             @default(0) // Negative for deduction (-2000), Positive for bonus (+500)
+  isRejection      Boolean           @default(false)
+  warningMessage   String?
+  displayOrder     Int               @default(0)
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  valuationAnswers ValuationAnswer[]
+
+  @@unique([questionId, code])
+}
+
+model PricingRule {
+  id              String    @id @default(cuid())
+  name            String
+  categoryId      String?
+  category        Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  brandId         String?
+  brand           Brand?    @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  modelId         String?
+  model           Model?    @relation(fields: [modelId], references: [id], onDelete: SetNull)
+  variantId       String?
+  variant         Variant?  @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  questionCode    String?
+  answerCode      String?
+  ruleType        String    @default("DEDUCTION") // DEDUCTION, ADDITION
+  adjustmentType  String    @default("FIXED") // FIXED, PERCENTAGE
+  adjustmentValue Float     @default(0)
+  priorityLevel   String    @default("GLOBAL") // GLOBAL, CATEGORY, BRAND, MODEL, VARIANT
+  maxCap          Float?
+  minCap          Float?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model ValuationSession {
+  id               String            @id @default(cuid())
+  sessionToken     String            @unique
+  categoryId       String
+  brandId          String
+  modelId          String
+  variantId        String
+  basePrice        Float
+  additionsTotal   Float             @default(0)
+  deductionsTotal  Float             @default(0)
+  estimatedPrice   Float
+  isRejected       Boolean           @default(false)
+  rejectionReason  String?
+  answersSummary   String?           // JSON string of selected answers
+  userIp           String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  valuationAnswers ValuationAnswer[]
+}
+
+model ValuationAnswer {
+  id          String           @id @default(cuid())
+  sessionId   String
+  session     ValuationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questionId  String
+  question    Question         @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answerId    String?
+  answer      Answer?          @relation(fields: [answerId], references: [id], onDelete: SetNull)
+  customValue String?
+  createdAt   DateTime         @default(now())
+}
+
+model Order {
+  id                 String               @id @default(cuid())
+  orderNumber        String               @unique // e.g. TMG-894215
+  userId             String?
+  user               User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customerName       String
+  customerPhone      String
+  customerEmail      String
+  categoryName       String
+  brandName          String
+  modelName          String
+  variantName        String
+  deviceImageUrl     String?
+  basePrice          Float
+  estimatedPrice     Float
+  finalVerifiedPrice Float?
+  status             String               @default("ORDER_PLACED") // ORDER_PLACED, PICKUP_SCHEDULED, COLLECTED, IN_VERIFICATION, PRICE_CONFIRMED, PAYMENT_COMPLETED, CANCELLED
+  paymentStatus      String               @default("PENDING") // PENDING, PROCESSING, PAID, FAILED
+  payoutMethod       String               @default("UPI") // UPI, BANK_TRANSFER
+  payoutUpiId        String?
+  payoutBankAccount  String?
+  payoutBankIfsc     String?
+  payoutBankName     String?
+  pickupDate         String
+  pickupTimeSlot     String
+  pickupAddress      String
+  pickupCity         String
+  pickupState        String
+  pickupPincode      String
+  pickupLandmark     String?
+  pickupNotes        String?
+  assignedAgent      String?
+  verificationNotes  String?
+  cancellationReason String?
+  conditionSummary   String?              // JSON string of answers given during valuation
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  verificationRecord VerificationRecord?
+  statusHistory      OrderStatusHistory[]
+}
+
+model VerificationRecord {
+  id                 String   @id @default(cuid())
+  orderId            String   @unique
+  order              Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  verifiedBy         String
+  declaredCondition  String   // JSON string
+  verifiedCondition  String   // JSON string
+  priceDelta         Float    @default(0)
+  adjustmentsApplied String?  // JSON string
+  inspectionNotes    String?
+  inspectionPhotos   String?  // JSON string of photo URLs
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model OrderStatusHistory {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    String
+  note      String?
+  changedBy String?
+  createdAt DateTime @default(now())
+}
+
+model Banner {
+  id           String    @id @default(cuid())
+  title        String
+  subtitle     String?
+  badgeText    String?
+  desktopImage String?
+  mobileImage  String?
+  ctaText      String    @default("Sell Now")
+  ctaUrl       String    @default("/sell")
+  displayOrder Int       @default(0)
+  isActive     Boolean   @default(true)
+  startDate    DateTime?
+  endDate      DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model FAQ {
+  id           String   @id @default(cuid())
+  category     String   @default("General") // General, Valuation, Pickup, Payment, Device Condition
+  question     String
+  answer       String
+  displayOrder Int      @default(0)
+  isFeatured   Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Blog {
+  id             String    @id @default(cuid())
+  title          String
+  slug           String    @unique
+  excerpt        String
+  content        String
+  coverImage     String?
+  author         String    @default("TrustMyGadget Team")
+  category       String    @default("Selling Guide")
+  readTime       String    @default("4 min read")
+  isPublished    Boolean   @default(true)
+  publishedAt    DateTime  @default(now())
+  seoTitle       String?
+  seoDescription String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Testimonial {
+  id           String   @id @default(cuid())
+  customerName String
+  location     String
+  deviceSold   String
+  rating       Int      @default(5)
+  reviewText   String
+  avatarUrl    String?
+  isFeatured   Boolean  @default(true)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Coupon {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  discountType  String    @default("FIXED") // FIXED, PERCENTAGE
+  discountValue Float
+  minOrderValue Float     @default(0)
+  maxBonus      Float?
+  expiresAt     DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Setting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  group       String   @default("general") // general, business, valuation, payment, notifications
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model SupportTicket {
+  id          String   @id @default(cuid())
+  ticketNo    String   @unique
+  name        String
+  email       String
+  phone       String?
+  subject     String
+  message     String
+  status      String   @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  priority    String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  orderNumber String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id          String     @id @default(cuid())
+  adminId     String?
+  admin       AdminUser? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  adminName   String
+  action      String     // e.g. "UPDATE_PRICE", "CREATE_RULE", "VERIFY_ORDER"
+  entityType  String     // e.g. "Model", "PricingRule", "Order"
+  entityId    String?
+  details     String
+  oldValues   String?    // JSON string
+  newValues   String?    // JSON string
+  ipAddress   String?
+  createdAt   DateTime   @default(now())
+}
