@@ -14,7 +14,21 @@ import {
   SEED_ORDERS,
 } from './seed-data';
 
-const dbPath = path.join(process.cwd(), 'trustmygadget.db');
+import fs from 'fs';
+
+const getDbPath = () => {
+  if (process.env.DATABASE_PATH) return process.env.DATABASE_PATH;
+  if (process.env.VERCEL || process.env.AWS_REGION) {
+    const tmpDir = '/tmp';
+    if (!fs.existsSync(tmpDir)) {
+      try { fs.mkdirSync(tmpDir, { recursive: true }); } catch (e) {}
+    }
+    return path.join(tmpDir, 'trustmygadget.db');
+  }
+  return path.join(process.cwd(), 'trustmygadget.db');
+};
+
+const dbPath = getDbPath();
 
 // Global singleton pattern for development hot-reloading
 declare global {
@@ -25,7 +39,11 @@ declare global {
 function getDatabase(): Database.Database {
   if (!global.__dbInstance) {
     const db = new Database(dbPath);
-    db.pragma('journal_mode = WAL');
+    try {
+      db.pragma('journal_mode = WAL');
+    } catch (e) {
+      db.pragma('journal_mode = DELETE');
+    }
     db.pragma('foreign_keys = ON');
     initTables(db);
     global.__dbInstance = db;
