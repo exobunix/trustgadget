@@ -88,8 +88,8 @@ html:not(.dark) {
     border-color: #e2e8f0 !important;
   }
 
-  /* Text Inversion for Light Mode - only invert body text, never buttons, badges, or elements explicitly styled for white text */
-  .text-white:not(.btn-text-preserve):not(.badge-preserve):not(button):not(button *):not(a.bg-gradient-to-r):not(a.bg-gradient-to-r *):not(.text-white-force) {
+  /* Text Inversion for Light Mode - inverts text-white to #0f172a in light mode, preserving explicitly styled white elements */
+  .text-white:not(.btn-text-preserve):not(.badge-preserve):not(.text-white-force):not(a.bg-gradient-to-r.text-white):not(a.bg-gradient-to-r.text-white *):not(button.bg-gradient-to-r.text-white):not(button.bg-gradient-to-r.text-white *) {
     color: #0f172a !important;
   }
   .text-slate-100 {

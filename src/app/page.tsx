@@ -609,7 +609,7 @@ export default function HomePage() {
               <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">
                 Real Customer Stories
               </span>
-              <h2 className="text-3xl font-extrabold text-white mt-1">
+              <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white mt-1">
                 Trusted by 150,000+ Gadget Sellers
               </h2>
             </div>
@@ -618,20 +618,20 @@ export default function HomePage() {
               {testimonials.map((t) => (
                 <div
                   key={t.id}
-                  className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between glass-panel"
+                  className="p-6 rounded-2xl bg-white/90 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 flex flex-col justify-between glass-panel shadow-sm"
                 >
                   <div>
-                    <div className="flex items-center gap-1 text-amber-400 mb-3">
+                    <div className="flex items-center gap-1 text-amber-500 dark:text-amber-400 mb-3">
                       {[...Array(t.rating || 5)].map((_, i) => (
                         <Star key={i} className="w-4 h-4 fill-amber-400" />
                       ))}
                     </div>
-                    <p className="text-xs text-slate-300 leading-relaxed italic">
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed italic">
                       "{t.reviewText}"
                     </p>
                   </div>
 
-                  <div className="mt-6 pt-4 border-t border-slate-800 flex items-center gap-3">
+                  <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden shrink-0 border border-slate-700">
                       {t.avatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -643,8 +643,8 @@ export default function HomePage() {
                       )}
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-white">{t.customerName}</div>
-                      <div className="text-[11px] text-cyan-400">{t.deviceSold}</div>
+                      <div className="text-xs font-bold text-slate-900 dark:text-white">{t.customerName}</div>
+                      <div className="text-[11px] text-cyan-600 dark:text-cyan-400 font-semibold">{t.deviceSold}</div>
                       <div className="text-[10px] text-slate-500">{t.location}</div>
                     </div>
                   </div>
@@ -658,13 +658,13 @@ export default function HomePage() {
       {/* ================= 7. FAQ ACCORDION (FULL WIDTH) ================= */}
       <section className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-10">
-          <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">
+          <span className="text-xs font-bold text-cyan-700 dark:text-cyan-400 uppercase tracking-widest">
             Have Questions?
           </span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white mt-1">
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white mt-1">
             Frequently Asked Questions
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 mt-2">
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-2 font-medium">
             Everything you need to know about instant price calculation, free doorstep pickup, certified data wiping, and direct payments.
           </p>
         </div>
@@ -675,19 +675,19 @@ export default function HomePage() {
             return (
               <div
                 key={faq.id}
-                className="rounded-2xl border border-slate-800 bg-slate-900/70 overflow-hidden glass-panel"
+                className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/70 overflow-hidden glass-panel shadow-sm hover:shadow-md transition-shadow"
               >
                 <button
                   onClick={() => setActiveFaq(isOpen ? null : faq.id)}
-                  className="w-full text-left p-5 flex items-center justify-between gap-4 font-semibold text-sm text-white hover:text-cyan-300 transition-colors"
+                  className="w-full text-left p-5 flex items-center justify-between gap-4 font-bold text-sm text-slate-900 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-300 transition-colors"
                 >
-                  <span>{faq.question}</span>
-                  <span className={`text-cyan-400 transition-transform ${isOpen ? 'rotate-90' : ''}`}>
+                  <span className="text-slate-900 dark:text-white">{faq.question}</span>
+                  <span className={`text-cyan-600 dark:text-cyan-400 transition-transform shrink-0 ${isOpen ? 'rotate-90' : ''}`}>
                     <ChevronRight className="w-4 h-4" />
                   </span>
                 </button>
                 {isOpen && (
-                  <div className="px-5 pb-5 pt-1 text-xs text-slate-300 leading-relaxed border-t border-slate-800/60 bg-slate-950/40">
+                  <div className="px-5 pb-5 pt-1 text-xs text-slate-600 dark:text-slate-300 leading-relaxed border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/80 dark:bg-slate-950/40">
                     {faq.answer}
                   </div>
                 )}
@@ -699,17 +699,17 @@ export default function HomePage() {
 
       {/* ================= 8. RESALE INSIGHTS BLOG ================= */}
       {blogs.length > 0 && (
-        <section className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-800">
+        <section className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-200 dark:border-slate-800">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
             <div>
-              <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">
+              <span className="text-xs font-bold text-cyan-700 dark:text-cyan-400 uppercase tracking-widest">
                 Knowledge Center
               </span>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-1">
                 Latest Resale Insights & Guides
               </h2>
             </div>
-            <Link href="/blog" className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
+            <Link href="/blog" className="text-xs font-semibold text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 flex items-center gap-1">
               Browse all articles <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -719,28 +719,28 @@ export default function HomePage() {
               <Link
                 key={blog.id}
                 href={`/blog/${blog.slug}`}
-                className="group p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-cyan-500/30 transition-all flex flex-col justify-between glass-panel"
+                className="group p-5 rounded-2xl bg-white/90 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 hover:border-cyan-500/40 transition-all flex flex-col justify-between glass-panel shadow-sm"
               >
                 <div>
-                  <div className="relative h-44 rounded-xl bg-slate-950 overflow-hidden mb-4 border border-slate-800">
+                  <div className="relative h-44 rounded-xl bg-slate-950 overflow-hidden mb-4 border border-slate-200 dark:border-slate-800">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={blog.coverImage || 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=600&auto=format&fit=crop&q=80'}
                       alt={blog.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
-                    <span className="absolute top-2.5 left-2.5 text-[10px] font-bold text-cyan-300 bg-slate-950/90 px-2.5 py-0.5 rounded border border-cyan-500/30">
+                    <span className="absolute top-2.5 left-2.5 text-[10px] font-bold text-cyan-800 dark:text-cyan-300 bg-white/90 dark:bg-slate-950/90 px-2.5 py-0.5 rounded border border-cyan-200 dark:border-cyan-500/30 shadow-sm">
                       {blog.category}
                     </span>
                   </div>
-                  <h3 className="font-bold text-sm text-white group-hover:text-cyan-300 transition-colors line-clamp-2">
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-300 transition-colors line-clamp-2">
                     {blog.title}
                   </h3>
-                  <p className="text-xs text-slate-400 mt-2 line-clamp-2 leading-relaxed">
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 line-clamp-2 leading-relaxed">
                     {blog.excerpt}
                   </p>
                 </div>
-                <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
+                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
                   <span>{blog.author}</span>
                   <span>{blog.readTime}</span>
                 </div>
