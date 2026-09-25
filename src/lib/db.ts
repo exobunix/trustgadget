@@ -455,27 +455,104 @@ function initTables(database: Database.Database) {
   const countRow = database.prepare('SELECT COUNT(*) as count FROM categories').get() as { count: number };
   if (countRow.count === 0) {
     seedDatabase(database);
+  } else {
+    // Check if catalog has all updated models synced
+    const modelCountRow = database.prepare('SELECT COUNT(*) as count FROM models').get() as { count: number };
+    if (modelCountRow.count < SEED_MODELS.length) {
+      syncCatalogSeed(database);
+    }
   }
 }
 
-function seedDatabase(database: Database.Database) {
-  const insertCategory = database.prepare(`
-    INSERT INTO categories (id, name, slug, icon, description, imageUrl, displayOrder, isActive)
-    VALUES (@id, @name, @slug, @icon, @description, @imageUrl, @displayOrder, 1)
-  `);
-
+function syncCatalogSeed(database: Database.Database) {
   const insertBrand = database.prepare(`
-    INSERT INTO brands (id, categoryId, name, slug, logoUrl, isPopular, displayOrder, isActive)
+    INSERT OR REPLACE INTO brands (id, categoryId, name, slug, logoUrl, isPopular, displayOrder, isActive)
     VALUES (@id, @categoryId, @name, @slug, @logoUrl, @isPopular, @displayOrder, 1)
   `);
 
   const insertModel = database.prepare(`
-    INSERT INTO models (id, brandId, categoryId, name, slug, series, imageUrl, releaseYear, basePrice, minPrice, maxPrice, isPopular, isFeatured, isActive, specifications)
+    INSERT OR REPLACE INTO models (id, brandId, categoryId, name, slug, series, imageUrl, releaseYear, basePrice, minPrice, maxPrice, isPopular, isFeatured, isActive, specifications)
     VALUES (@id, @brandId, @categoryId, @name, @slug, @series, @imageUrl, @releaseYear, @basePrice, @minPrice, @maxPrice, @isPopular, @isFeatured, 1, @specifications)
   `);
 
   const insertVariant = database.prepare(`
-    INSERT INTO variants (id, modelId, name, slug, ram, storage, processor, gpu, screenSize, color, basePrice, minPrice, maxPrice, isDefault, isActive)
+    INSERT OR REPLACE INTO variants (id, modelId, name, slug, ram, storage, processor, gpu, screenSize, color, basePrice, minPrice, maxPrice, isDefault, isActive)
+    VALUES (@id, @modelId, @name, @slug, @ram, @storage, @processor, @gpu, @screenSize, @color, @basePrice, @minPrice, @maxPrice, @isDefault, 1)
+  `);
+
+  const transaction = database.transaction(() => {
+    for (const b of SEED_BRANDS) {
+      insertBrand.run({
+        id: b.id,
+        categoryId: b.categoryId,
+        name: b.name,
+        slug: b.slug,
+        logoUrl: b.logoUrl,
+        isPopular: b.isPopular ? 1 : 0,
+        displayOrder: b.displayOrder,
+      });
+    }
+
+    for (const m of SEED_MODELS) {
+      insertModel.run({
+        id: m.id,
+        brandId: m.brandId,
+        categoryId: m.categoryId,
+        name: m.name,
+        slug: m.slug,
+        series: m.series,
+        imageUrl: m.imageUrl,
+        releaseYear: m.releaseYear,
+        basePrice: m.basePrice,
+        minPrice: m.minPrice,
+        maxPrice: m.maxPrice,
+        isPopular: m.isPopular ? 1 : 0,
+        isFeatured: m.isFeatured ? 1 : 0,
+        specifications: JSON.stringify(m.specifications),
+      });
+
+      for (const v of m.variants) {
+        insertVariant.run({
+          id: v.id,
+          modelId: m.id,
+          name: v.name,
+          slug: v.slug,
+          ram: v.ram || null,
+          storage: v.storage || null,
+          processor: v.processor || null,
+          gpu: v.gpu || null,
+          screenSize: v.screenSize || null,
+          color: v.color || null,
+          basePrice: v.basePrice,
+          minPrice: v.minPrice,
+          maxPrice: v.maxPrice,
+          isDefault: v.isDefault ? 1 : 0,
+        });
+      }
+    }
+  });
+
+  transaction();
+}
+
+function seedDatabase(database: Database.Database) {
+  const insertCategory = database.prepare(`
+    INSERT OR REPLACE INTO categories (id, name, slug, icon, description, imageUrl, displayOrder, isActive)
+    VALUES (@id, @name, @slug, @icon, @description, @imageUrl, @displayOrder, 1)
+  `);
+
+  const insertBrand = database.prepare(`
+    INSERT OR REPLACE INTO brands (id, categoryId, name, slug, logoUrl, isPopular, displayOrder, isActive)
+    VALUES (@id, @categoryId, @name, @slug, @logoUrl, @isPopular, @displayOrder, 1)
+  `);
+
+  const insertModel = database.prepare(`
+    INSERT OR REPLACE INTO models (id, brandId, categoryId, name, slug, series, imageUrl, releaseYear, basePrice, minPrice, maxPrice, isPopular, isFeatured, isActive, specifications)
+    VALUES (@id, @brandId, @categoryId, @name, @slug, @series, @imageUrl, @releaseYear, @basePrice, @minPrice, @maxPrice, @isPopular, @isFeatured, 1, @specifications)
+  `);
+
+  const insertVariant = database.prepare(`
+    INSERT OR REPLACE INTO variants (id, modelId, name, slug, ram, storage, processor, gpu, screenSize, color, basePrice, minPrice, maxPrice, isDefault, isActive)
     VALUES (@id, @modelId, @name, @slug, @ram, @storage, @processor, @gpu, @screenSize, @color, @basePrice, @minPrice, @maxPrice, @isDefault, 1)
   `);
 
