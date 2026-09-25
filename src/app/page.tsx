@@ -304,7 +304,7 @@ export default function HomePage() {
       {/* ================= 2. CAROUSEL BANNERS (CMS BACKED) ================= */}
       {banners.length > 0 && (
         <section className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative rounded-3xl overflow-hidden border border-slate-800 glass-panel shadow-2xl">
+          <div className="relative rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-gradient-to-r from-sky-50 via-white to-blue-50/70 dark:bg-slate-900 shadow-xl dark:shadow-2xl">
             <div className="relative h-64 sm:h-72 md:h-80 w-full overflow-hidden">
               {banners.map((banner, index) => (
                 <div
@@ -313,32 +313,32 @@ export default function HomePage() {
                     index === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
                   }`}
                 >
-                  {/* Background Image with Dark Gradient Overlay */}
+                  {/* Background Image with Adaptive Light/Dark Gradient Overlay */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={banner.desktopImage}
                     alt={banner.title}
-                    className="absolute inset-0 w-full h-full object-cover opacity-25"
+                    className="absolute inset-0 w-full h-full object-cover opacity-15 dark:opacity-25"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/95 via-white/80 to-transparent dark:from-slate-950 dark:via-slate-950/80 dark:to-transparent" />
 
                   {/* Banner Content */}
                   <div className="relative z-10 max-w-xl px-6 sm:px-12 py-8 space-y-3">
                     {banner.badgeText && (
-                      <span className="inline-block text-[11px] font-bold text-cyan-400 bg-cyan-950/80 px-2.5 py-0.5 rounded-full border border-cyan-500/30">
+                      <span className="inline-block text-[11px] font-bold text-cyan-800 dark:text-cyan-400 bg-cyan-100/90 dark:bg-cyan-950/80 px-2.5 py-0.5 rounded-full border border-cyan-200 dark:border-cyan-500/30 shadow-sm">
                         {banner.badgeText}
                       </span>
                     )}
-                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white leading-tight">
+                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 dark:text-white leading-tight">
                       {banner.title}
                     </h2>
-                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
                       {banner.subtitle}
                     </p>
                     <div className="pt-2">
                       <Link
                         href={banner.ctaUrl || '/sell'}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 text-xs sm:text-sm font-bold transition-all shadow-md"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs sm:text-sm font-bold transition-all shadow-md shadow-cyan-500/20"
                       >
                         <span>{banner.ctaText || 'Sell Now'}</span>
                         <ArrowRight className="w-3.5 h-3.5" />
@@ -354,7 +354,8 @@ export default function HomePage() {
               <div className="absolute bottom-4 right-6 z-20 flex items-center gap-2">
                 <button
                   onClick={() => setCurrentBanner((prev) => (prev - 1 + banners.length) % banners.length)}
-                  className="p-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-700"
+                  className="p-1.5 rounded-lg bg-white/90 hover:bg-white text-slate-700 dark:bg-slate-900/80 dark:hover:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-sm"
+                  aria-label="Previous banner"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -364,14 +365,16 @@ export default function HomePage() {
                       key={i}
                       onClick={() => setCurrentBanner(i)}
                       className={`h-1.5 rounded-full transition-all ${
-                        i === currentBanner ? 'w-6 bg-cyan-400' : 'w-2 bg-slate-700'
+                        i === currentBanner ? 'w-6 bg-cyan-500 dark:bg-cyan-400' : 'w-2 bg-slate-300 dark:bg-slate-700'
                       }`}
+                      aria-label={`Go to slide ${i + 1}`}
                     />
                   ))}
                 </div>
                 <button
                   onClick={() => setCurrentBanner((prev) => (prev + 1) % banners.length)}
-                  className="p-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-700"
+                  className="p-1.5 rounded-lg bg-white/90 hover:bg-white text-slate-700 dark:bg-slate-900/80 dark:hover:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-sm"
+                  aria-label="Next banner"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -749,28 +752,28 @@ export default function HomePage() {
 
       {/* ================= 9. FINAL HIGH-CONVERSION CTA ================= */}
       <section className="py-20 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-950/20 to-slate-950 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-100/40 to-slate-100/60 dark:via-cyan-950/20 dark:to-slate-950 pointer-events-none" />
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <div className="p-10 sm:p-14 rounded-3xl bg-gradient-to-tr from-slate-900 via-slate-900 to-slate-950 border border-cyan-500/40 shadow-2xl neon-glow-cyan">
-            <span className="inline-block text-xs font-bold text-cyan-400 bg-cyan-950/80 px-3 py-1 rounded-full border border-cyan-500/30 mb-4">
+          <div className="p-10 sm:p-14 rounded-3xl bg-gradient-to-br from-sky-50 via-white to-cyan-50/80 dark:bg-gradient-to-tr dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 border border-cyan-200 dark:border-cyan-500/40 shadow-xl shadow-cyan-500/5 dark:shadow-2xl">
+            <span className="inline-block text-xs font-bold text-cyan-800 dark:text-cyan-400 bg-cyan-100/90 dark:bg-cyan-950/80 px-3.5 py-1 rounded-full border border-cyan-200 dark:border-cyan-500/30 mb-4 shadow-sm">
               FASTEST PAYOUT GUARANTEED
             </span>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Ready to turn your old gadget into cash?
             </h2>
-            <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto mt-4 leading-relaxed">
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-xl mx-auto mt-4 leading-relaxed font-medium">
               Get an instant valuation in 60 seconds with zero obligation. Free doorstep pickup scheduled at your convenience.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
                 href="/sell"
-                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 font-extrabold text-base shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] transition-all"
+                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-base shadow-xl shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
                 Sell Your Device Now →
               </Link>
               <Link
                 href="/faqs"
-                className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-white font-semibold text-sm border border-slate-600 transition-all"
+                className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-sm dark:bg-slate-800/80 dark:hover:bg-slate-700 dark:text-white dark:border-slate-600 font-semibold text-sm transition-all"
               >
                 Read Resale FAQs
               </Link>

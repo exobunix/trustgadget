@@ -88,8 +88,8 @@ html:not(.dark) {
     border-color: #e2e8f0 !important;
   }
 
-  /* Text Inversion for Light Mode */
-  .text-white:not(.btn-text-preserve):not(.badge-preserve) {
+  /* Text Inversion for Light Mode - only invert body text, never buttons, badges, or elements explicitly styled for white text */
+  .text-white:not(.btn-text-preserve):not(.badge-preserve):not(button):not(button *):not(a.bg-gradient-to-r):not(a.bg-gradient-to-r *):not(.text-white-force) {
     color: #0f172a !important;
   }
   .text-slate-100 {
@@ -103,6 +103,17 @@ html:not(.dark) {
   }
   .text-slate-400 {
     color: #64748b !important;
+  }
+
+  /* Adaptive Card Gradients for Light Mode (guarantees no dark slabs in light mode) */
+  .bg-gradient-to-tr.from-slate-900,
+  .bg-gradient-to-r.from-slate-900,
+  .bg-gradient-to-br.from-slate-900 {
+    background-image: linear-gradient(135deg, #f0fdf4 0%, #ffffff 50%, #f0f9ff 100%) !important;
+    border-color: #cbd5e1 !important;
+  }
+  .bg-gradient-to-r.from-slate-950 {
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.8), transparent) !important;
   }
 
   /* Inputs & Forms in Light Mode */
@@ -172,14 +183,15 @@ html:not(.dark) {
   }
 
   /* Keep CTA Buttons and Badges with Proper Contrast */
-  a.bg-gradient-to-r,
-  button.bg-gradient-to-r,
-  .bg-gradient-to-r {
+  a.bg-gradient-to-r:not(.text-white),
+  button.bg-gradient-to-r:not(.text-white) {
     color: #020617 !important;
   }
-  a.bg-gradient-to-r *,
-  button.bg-gradient-to-r * {
-    color: #020617 !important;
+  a.bg-gradient-to-r.text-white,
+  button.bg-gradient-to-r.text-white,
+  a.bg-gradient-to-r.text-white *,
+  button.bg-gradient-to-r.text-white * {
+    color: #ffffff !important;
   }
   .bg-emerald-500 {
     background-color: #10b981 !important;

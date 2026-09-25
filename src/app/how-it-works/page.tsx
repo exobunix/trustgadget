@@ -86,14 +86,14 @@ export default function HowItWorksPage() {
       </div>
 
       {/* CTA Box */}
-      <div className="p-10 rounded-3xl bg-gradient-to-tr from-slate-900 via-slate-900 to-slate-950 border border-cyan-500/40 shadow-2xl text-center neon-glow-cyan">
-        <h2 className="text-2xl sm:text-3xl font-bold text-white">Ready to experience the fastest tech trade-in?</h2>
-        <p className="text-xs sm:text-sm text-slate-300 mt-2 max-w-md mx-auto">
+      <div className="p-10 rounded-3xl bg-gradient-to-br from-sky-50 via-white to-cyan-50/80 dark:bg-gradient-to-tr dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 border border-cyan-200 dark:border-cyan-500/40 shadow-xl shadow-cyan-500/5 dark:shadow-2xl text-center">
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">Ready to experience the fastest tech trade-in?</h2>
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-2 max-w-md mx-auto font-medium">
           Get an instant estimated price in under 60 seconds with no obligation.
         </p>
         <Link
           href="/sell"
-          className="mt-6 inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 font-extrabold text-sm shadow-lg shadow-cyan-500/25 hover:scale-[1.02] transition-all"
+          className="mt-6 inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-sm shadow-xl shadow-cyan-500/25 hover:scale-[1.02] transition-all"
         >
           <span>Sell Your Device Now</span>
           <ArrowRight className="w-4 h-4" />

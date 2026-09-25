@@ -70,31 +70,31 @@ export default function OrderConfirmedPage() {
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto">
       {/* Celebration Card */}
-      <div className="p-8 sm:p-10 rounded-3xl bg-gradient-to-tr from-slate-900 via-slate-900 to-slate-950 border border-emerald-500/40 shadow-2xl text-center neon-glow-emerald relative overflow-hidden">
-        <div className="w-16 h-16 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 flex items-center justify-center text-emerald-400 mx-auto mb-4">
+      <div className="p-8 sm:p-10 rounded-3xl bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/50 dark:bg-gradient-to-tr dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 border border-emerald-200 dark:border-emerald-500/40 shadow-xl dark:shadow-2xl text-center relative overflow-hidden">
+        <div className="w-16 h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-500/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mx-auto mb-4">
           <CheckCircle2 className="w-8 h-8" />
         </div>
 
-        <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">
+        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">
           SELL ORDER PLACED SUCCESSFULLY
         </span>
-        <h1 className="text-2xl sm:text-3xl font-black text-white mt-1">
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1">
           Your Pickup Has Been Scheduled!
         </h1>
-        <p className="text-xs sm:text-sm text-slate-400 mt-2 max-w-md mx-auto">
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-2 max-w-md mx-auto font-medium">
           Our logistics agent will visit your address for doorstep verification and instant payout.
         </p>
 
         {/* Order Number Pill */}
-        <div className="mt-6 inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm">
-          <span className="text-slate-400">Order ID:</span>
-          <span className="font-mono font-bold text-cyan-300">{order?.orderNumber || orderId}</span>
+        <div className="mt-6 inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm shadow-sm">
+          <span className="text-slate-500 dark:text-slate-400">Order ID:</span>
+          <span className="font-mono font-bold text-cyan-700 dark:text-cyan-300">{order?.orderNumber || orderId}</span>
           <button
             onClick={handleCopyOrderNumber}
-            className="p-1 text-slate-400 hover:text-white"
+            className="p-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
             title="Copy Order ID"
           >
-            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+            {copied ? <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-4 h-4" />}
           </button>
         </div>
       </div>
