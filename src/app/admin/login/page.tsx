@@ -1,19 +1,30 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Lock, Mail, ShieldCheck, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
+import { Lock, Mail, ShieldCheck, ArrowRight, AlertCircle } from 'lucide-react';
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('admin@trustmygadget.com');
-  const [password, setPassword] = useState('admin@2026');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Clear any existing session when landing on the login page so admin is never logged in directly
+  useEffect(() => {
+    localStorage.removeItem('tmg_admin_user');
+    document.cookie = 'tmg_admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim() || !password.trim()) {
+      setErrorMsg('Please enter both your admin email and password.');
+      return;
+    }
+
     setLoading(true);
     setErrorMsg('');
 
@@ -21,14 +32,14 @@ export default function AdminLoginPage() {
       const res = await fetch('/api/admin/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password: password.trim() }),
       });
       const data = await res.json();
       if (data.success) {
         localStorage.setItem('tmg_admin_user', JSON.stringify(data.data));
         router.push('/admin');
       } else {
-        setErrorMsg(data.error || 'Authentication failed. Please check credentials.');
+        setErrorMsg(data.error || 'Invalid credentials. Please enter a valid admin email and password.');
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Error connecting to admin auth server.');
@@ -39,7 +50,7 @@ export default function AdminLoginPage() {
 
   return (
     <div className="min-h-screen bg-[#050811] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Cyberpunk Glow Background */}
+      {/* Glow Background */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 left-1/3 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -59,20 +70,8 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        {/* Demo Credentials Box */}
-        <div className="p-3.5 rounded-2xl bg-slate-950 border border-purple-500/30 text-xs space-y-1">
-          <div className="flex items-center gap-1.5 font-bold text-purple-300">
-            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-            <span>Master Admin Credentials:</span>
-          </div>
-          <div className="text-slate-300 font-mono text-[11px] flex justify-between">
-            <span>Email: <b className="text-cyan-300">admin@trustmygadget.com</b></span>
-            <span>Pass: <b className="text-cyan-300">admin@2026</b></span>
-          </div>
-        </div>
-
         {errorMsg && (
-          <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-500/40 text-rose-200 text-xs flex items-center gap-2">
+          <div className="p-3.5 rounded-xl bg-rose-950/80 border border-rose-500/40 text-rose-200 text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
             <span>{errorMsg}</span>
           </div>
@@ -86,6 +85,7 @@ export default function AdminLoginPage() {
               <input
                 type="text"
                 required
+                placeholder="Enter admin email or username..."
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition-all font-mono"
@@ -100,6 +100,7 @@ export default function AdminLoginPage() {
               <input
                 type="password"
                 required
+                placeholder="Enter admin password..."
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition-all font-mono"

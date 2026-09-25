@@ -122,7 +122,6 @@ export function Footer() {
               <li><Link href="/blog" className="hover:text-cyan-400 transition-colors">Resale Insights Blog</Link></li>
               <li><Link href="/contact" className="hover:text-cyan-400 transition-colors">Contact Support</Link></li>
               <li><Link href="/track-order" className="hover:text-cyan-400 transition-colors text-emerald-400 font-semibold">Track Your Order</Link></li>
-              <li><Link href="/admin" className="hover:text-purple-400 transition-colors text-purple-400 flex items-center gap-1"><Sparkles className="w-3 h-3" /> Admin Portal</Link></li>
             </ul>
           </div>
 

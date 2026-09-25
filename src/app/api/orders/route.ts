@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, dbHelpers } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -16,7 +19,7 @@ export async function GET(request: NextRequest) {
       conditions.push('userId = ?');
       params.push(userId);
     }
-    if (status) {
+    if (status && status !== 'ALL') {
       conditions.push('status = ?');
       params.push(status);
     }
@@ -29,7 +32,16 @@ export async function GET(request: NextRequest) {
     params.push(limit);
 
     const orders = db.prepare(query).all(...params);
-    return NextResponse.json({ success: true, data: orders });
+    return NextResponse.json(
+      { success: true, data: orders },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      }
+    );
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

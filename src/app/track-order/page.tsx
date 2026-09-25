@@ -16,6 +16,7 @@ import {
   MapPin,
   Calendar,
   Zap,
+  RefreshCw,
 } from 'lucide-react';
 
 const ORDER_STAGES = [
@@ -36,18 +37,41 @@ function TrackOrderContent() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  const [refreshing, setRefreshing] = useState(false);
+
   useEffect(() => {
     if (initialQuery) {
       handleSearch(initialQuery);
     }
   }, [initialQuery]);
 
+  // Periodic polling to update status in real-time when order is active
+  useEffect(() => {
+    if (!order?.orderNumber) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/orders/track?q=${encodeURIComponent(order.orderNumber)}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+        });
+        const data = await res.json();
+        if (data.success) {
+          setOrder(data.data);
+        }
+      } catch (e) {}
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [order?.orderNumber]);
+
   const handleSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
     setLoading(true);
     setErrorMsg('');
     try {
-      const res = await fetch(`/api/orders/track?q=${encodeURIComponent(searchQuery.trim())}`);
+      const res = await fetch(`/api/orders/track?q=${encodeURIComponent(searchQuery.trim())}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+      });
       const data = await res.json();
       if (data.success) {
         setOrder(data.data);
@@ -59,6 +83,24 @@ function TrackOrderContent() {
       setErrorMsg(e.message || 'Error tracking order.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleManualRefresh = async () => {
+    if (!order?.orderNumber) return;
+    setRefreshing(true);
+    try {
+      const res = await fetch(`/api/orders/track?q=${encodeURIComponent(order.orderNumber)}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOrder(data.data);
+      }
+    } catch (e) {}
+    finally {
+      setRefreshing(false);
     }
   };
 
@@ -81,7 +123,7 @@ function TrackOrderContent() {
           Track Your Sell Order
         </h1>
         <p className="text-xs text-slate-400 mt-2">
-          Enter your Order ID (e.g. TMG-849201) or registered 10-digit mobile number.
+          Enter your Order ID (e.g. TMG-481920) or registered 10-digit mobile number.
         </p>
 
         {/* Search Bar */}
@@ -138,7 +180,15 @@ function TrackOrderContent() {
                 </p>
               </div>
 
-              <div className="text-left sm:text-right">
+              <div className="flex flex-col sm:items-end gap-2">
+                <button
+                  onClick={handleManualRefresh}
+                  disabled={refreshing}
+                  className="px-3 py-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-800 text-slate-300 border border-slate-700/60 flex items-center gap-1.5 text-[11px] self-start sm:self-end"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${refreshing ? 'animate-spin' : ''}`} />
+                  <span>Refresh Live Status</span>
+                </button>
                 <div className="text-xs text-slate-400">
                   {order.finalVerifiedPrice ? 'Confirmed Payout' : 'Estimated Payout'}
                 </div>

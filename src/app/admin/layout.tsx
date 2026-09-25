@@ -43,6 +43,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [adminUser, setAdminUser] = useState<any>(null);
 
   useEffect(() => {
     if (pathname === '/admin/login') {
@@ -50,13 +51,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       return;
     }
     // Check if session or localStorage exists
-    const hasUser = typeof window !== 'undefined' && localStorage.getItem('tmg_admin_user');
+    const hasUser = typeof window !== 'undefined' ? localStorage.getItem('tmg_admin_user') : null;
     const hasCookie = typeof document !== 'undefined' && document.cookie.includes('tmg_admin_session');
 
     if (!hasUser && !hasCookie) {
       setAuthenticated(false);
       router.push('/admin/login');
     } else {
+      if (hasUser) {
+        try {
+          setAdminUser(JSON.parse(hasUser));
+        } catch (e) {}
+      }
       setAuthenticated(true);
     }
   }, [pathname, router]);
@@ -66,6 +72,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       await fetch('/api/admin/auth/logout', { method: 'POST' });
     } catch (e) {}
     localStorage.removeItem('tmg_admin_user');
+    document.cookie = 'tmg_admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    setAuthenticated(false);
     router.push('/admin/login');
   };
 
@@ -74,10 +82,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return <>{children}</>;
   }
 
-  if (authenticated === false) {
+  if (!authenticated) {
     return (
       <div className="min-h-screen bg-[#050811] flex items-center justify-center text-slate-400 text-xs">
-        Redirecting to Admin Login...
+        Verifying administrator authorization...
       </div>
     );
   }
@@ -172,8 +180,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             >
               <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <div className="text-left hidden sm:block">
-                <div className="text-[10px] text-purple-300 font-bold uppercase">{currentRole.name}</div>
-                <div className="text-xs text-slate-400 -mt-0.5">{currentRole.desc}</div>
+                <div className="text-[10px] text-purple-300 font-bold uppercase">{adminUser?.name || currentRole.name}</div>
+                <div className="text-xs text-slate-400 -mt-0.5">{adminUser?.email || currentRole.desc}</div>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>

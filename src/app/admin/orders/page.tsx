@@ -50,10 +50,16 @@ export default function AdminOrdersPage() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/orders?limit=100');
+      const res = await fetch('/api/orders?limit=100', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      });
       const data = await res.json();
       if (data.success) {
-        setOrders(data.data);
+        setOrders(data.data || []);
       }
     } catch (e) {
       console.error(e);
@@ -64,6 +70,8 @@ export default function AdminOrdersPage() {
 
   useEffect(() => {
     fetchOrders();
+    const interval = setInterval(fetchOrders, 8000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleUpdateStatus = async () => {
@@ -76,14 +84,14 @@ export default function AdminOrdersPage() {
         body: JSON.stringify({
           status: newStatus || selectedOrder.status,
           assignedAgent: newAgent || selectedOrder.assignedAgent,
-          statusNote,
+          statusNote: statusNote || `Status updated to ${newStatus || selectedOrder.status}`,
           adminName: 'Super Admin',
         }),
       });
       const data = await res.json();
       if (data.success) {
         setSelectedOrder(null);
-        fetchOrders();
+        await fetchOrders();
       }
     } catch (e) {
       console.error(e);
@@ -112,11 +120,14 @@ export default function AdminOrdersPage() {
 
   const filteredOrders = orders.filter((o) => {
     const matchStatus = statusFilter === 'ALL' || o.status === statusFilter;
+    const s = search.toLowerCase();
     const matchSearch =
-      o.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
-      o.customerName.toLowerCase().includes(search.toLowerCase()) ||
-      o.customerPhone.includes(search) ||
-      o.modelName.toLowerCase().includes(search.toLowerCase());
+      !search ||
+      (o.orderNumber && o.orderNumber.toLowerCase().includes(s)) ||
+      (o.customerName && o.customerName.toLowerCase().includes(s)) ||
+      (o.customerPhone && o.customerPhone.includes(search)) ||
+      (o.modelName && o.modelName.toLowerCase().includes(s)) ||
+      (o.pickupCity && o.pickupCity.toLowerCase().includes(s));
     return matchStatus && matchSearch;
   });
 

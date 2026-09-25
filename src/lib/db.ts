@@ -436,6 +436,21 @@ function initTables(database: Database.Database) {
     // Column already exists
   }
 
+  // Purge any dummy seed orders from the system
+  try {
+    database.prepare(`
+      DELETE FROM orders WHERE id IN ('ord_1001', 'ord_1002', 'ord_1003', 'ord_1004') OR orderNumber IN ('TMG-849201', 'TMG-739104', 'TMG-910283', 'TMG-652918')
+    `).run();
+    database.prepare(`
+      DELETE FROM order_status_history WHERE orderId IN ('ord_1001', 'ord_1002', 'ord_1003', 'ord_1004')
+    `).run();
+    database.prepare(`
+      DELETE FROM verification_records WHERE orderId IN ('ord_1001', 'ord_1002', 'ord_1003', 'ord_1004')
+    `).run();
+  } catch (e) {
+    // Ignore error if tables not yet populated
+  }
+
   // Check if categories already seeded
   const countRow = database.prepare('SELECT COUNT(*) as count FROM categories').get() as { count: number };
   if (countRow.count === 0) {
@@ -616,43 +631,6 @@ function seedDatabase(database: Database.Database) {
       insertAdminUser.run({
         ...u,
         isActive: u.isActive ? 1 : 0,
-      });
-    }
-
-    // Orders
-    for (const o of SEED_ORDERS) {
-      insertOrder.run({
-        id: o.id,
-        orderNumber: o.orderNumber,
-        customerName: o.customerName,
-        customerPhone: o.customerPhone,
-        customerEmail: o.customerEmail || '',
-        categoryName: o.categoryName,
-        brandName: o.brandName,
-        modelName: o.modelName,
-        variantName: o.variantName,
-        deviceImageUrl: o.deviceImageUrl || null,
-        basePrice: o.basePrice,
-        estimatedPrice: o.estimatedPrice,
-        finalVerifiedPrice: o.finalVerifiedPrice ?? null,
-        status: o.status || 'ORDER_PLACED',
-        paymentStatus: o.paymentStatus || 'PENDING',
-        payoutMethod: o.payoutMethod || 'UPI',
-        payoutUpiId: o.payoutUpiId || null,
-        payoutBankAccount: o.payoutBankAccount || null,
-        payoutBankIfsc: o.payoutBankIfsc || null,
-        payoutBankName: (o as any).payoutBankName || null,
-        pickupDate: o.pickupDate,
-        pickupTimeSlot: o.pickupTimeSlot,
-        pickupAddress: o.pickupAddress,
-        pickupCity: o.pickupCity,
-        pickupState: o.pickupState,
-        pickupPincode: o.pickupPincode,
-        pickupLandmark: o.pickupLandmark || null,
-        pickupNotes: (o as any).pickupNotes || null,
-        assignedAgent: (o as any).assignedAgent || null,
-        verificationNotes: (o as any).verificationNotes || null,
-        conditionSummary: (o as any).conditionSummary ? JSON.stringify((o as any).conditionSummary) : null,
       });
     }
 
@@ -849,14 +827,14 @@ export const dbHelpers = {
         basePrice, estimatedPrice, finalVerifiedPrice, status, paymentStatus,
         payoutMethod, payoutUpiId, payoutBankAccount, payoutBankIfsc, payoutBankName,
         pickupDate, pickupTimeSlot, pickupAddress, pickupCity, pickupState,
-        pickupPincode, pickupLandmark, pickupNotes, conditionSummary
+        pickupPincode, pickupLandmark, pickupNotes, conditionSummary, createdAt, updatedAt
       ) VALUES (
         @id, @orderNumber, @userId, @customerName, @customerPhone, @customerEmail,
         @categoryName, @brandName, @modelName, @variantName, @deviceImageUrl,
         @basePrice, @estimatedPrice, @finalVerifiedPrice, @status, @paymentStatus,
         @payoutMethod, @payoutUpiId, @payoutBankAccount, @payoutBankIfsc, @payoutBankName,
         @pickupDate, @pickupTimeSlot, @pickupAddress, @pickupCity, @pickupState,
-        @pickupPincode, @pickupLandmark, @pickupNotes, @conditionSummary
+        @pickupPincode, @pickupLandmark, @pickupNotes, @conditionSummary, datetime('now'), datetime('now')
       )
     `);
     stmt.run({

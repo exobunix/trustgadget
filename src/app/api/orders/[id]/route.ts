@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, dbHelpers } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -16,20 +19,29 @@ export async function GET(
     const history = db.prepare('SELECT * FROM order_status_history WHERE orderId = ? ORDER BY createdAt ASC').all(order.id);
     const verification = db.prepare('SELECT * FROM verification_records WHERE orderId = ?').get(order.id) as any;
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        ...order,
-        conditionSummary: order.conditionSummary ? JSON.parse(order.conditionSummary) : {},
-        statusHistory: history,
-        verificationRecord: verification ? {
-          ...verification,
-          declaredCondition: JSON.parse(verification.declaredCondition || '{}'),
-          verifiedCondition: JSON.parse(verification.verifiedCondition || '{}'),
-          inspectionPhotos: verification.inspectionPhotos ? JSON.parse(verification.inspectionPhotos) : [],
-        } : null,
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          ...order,
+          conditionSummary: order.conditionSummary ? JSON.parse(order.conditionSummary) : {},
+          statusHistory: history,
+          verificationRecord: verification ? {
+            ...verification,
+            declaredCondition: JSON.parse(verification.declaredCondition || '{}'),
+            verifiedCondition: JSON.parse(verification.verifiedCondition || '{}'),
+            inspectionPhotos: verification.inspectionPhotos ? JSON.parse(verification.inspectionPhotos) : [],
+          } : null,
+        },
       },
-    });
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      }
+    );
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
