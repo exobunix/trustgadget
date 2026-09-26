@@ -460,6 +460,14 @@ function initTables(database: Database.Database) {
     const modelCountRow = database.prepare('SELECT COUNT(*) as count FROM models').get() as { count: number };
     if (modelCountRow.count < SEED_MODELS.length) {
       syncCatalogSeed(database);
+    } else {
+      // Ensure brand logo URLs are updated to local fast SVGs
+      try {
+        const updateBrandLogo = database.prepare('UPDATE brands SET logoUrl = ? WHERE id = ?');
+        for (const b of SEED_BRANDS) {
+          updateBrandLogo.run(b.logoUrl, b.id);
+        }
+      } catch (e) {}
     }
   }
 }

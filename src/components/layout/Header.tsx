@@ -44,10 +44,6 @@ export function Header() {
 
   const navLinks = [
     { name: 'Home', href: '/' },
-    { name: 'Sell Your Device', href: '/sell' },
-    { name: 'How It Works', href: '/how-it-works' },
-    { name: 'Why TrustMyGadget', href: '/why-us' },
-    { name: 'About Us', href: '/about' },
     { name: 'Contact', href: '/contact' },
   ];
 
@@ -63,17 +59,17 @@ export function Header() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             {/* LEFT: Logo */}
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="relative w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 p-0.5 shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-all">
+            <Link href="/" className="flex items-center gap-2 sm:gap-2.5 group shrink-0">
+              <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 p-0.5 shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-all shrink-0">
                 <div className="w-full h-full bg-white dark:bg-slate-950 rounded-[10px] flex items-center justify-center">
-                  <ShieldCheck className="w-5 h-5 text-cyan-600 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
+                  <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
                 </div>
               </div>
               <div className="flex flex-col">
-                <span className="text-xl font-black tracking-tight text-slate-900 dark:text-white flex items-center">
+                <span className="text-lg sm:text-xl font-black tracking-tight text-slate-900 dark:text-white flex items-center">
                   Trust<span className="text-cyan-600 dark:text-cyan-400">My</span>Gadget
                 </span>
-                <span className="text-[10px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-semibold -mt-1">
+                <span className="text-[9px] sm:text-[10px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-semibold -mt-1">
                   Instant Tech Resale
                 </span>
               </div>
@@ -87,7 +83,7 @@ export function Header() {
                   <Link
                     key={link.name}
                     href={link.href}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                       isActive
                         ? 'text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-500/30 shadow-sm shadow-cyan-500/10'
                         : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50'
@@ -100,14 +96,14 @@ export function Header() {
             </nav>
 
             {/* RIGHT: Actions & CTAs */}
-            <div className="flex items-center gap-2 sm:gap-2.5">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 flex-nowrap">
               {/* Instant Search Trigger */}
               <button
                 onClick={() => setSearchOpen(true)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-900/80 hover:bg-slate-200/80 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700/60 transition-all text-xs font-medium"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-900/80 hover:bg-slate-200/80 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700/60 transition-all text-xs font-medium"
                 title="Search gadgets"
               >
-                <Search className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-600 dark:text-cyan-400" />
                 <span className="hidden xl:inline">Search device...</span>
                 <kbd className="hidden xl:inline text-[10px] bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700">⌘K</kbd>
               </button>
@@ -118,7 +114,7 @@ export function Header() {
               {/* Track Order */}
               <Link
                 href="/track-order"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all"
+                className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all whitespace-nowrap"
               >
                 <Truck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 <span>Track Order</span>
@@ -127,16 +123,16 @@ export function Header() {
               {/* User Account */}
               <Link
                 href="/account"
-                className="p-2 rounded-xl bg-slate-100/90 dark:bg-slate-900/80 hover:bg-slate-200/80 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700/60 transition-all"
+                className="p-1.5 sm:p-2 rounded-xl bg-slate-100/90 dark:bg-slate-900/80 hover:bg-slate-200/80 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700/60 transition-all"
                 title="Customer Account"
               >
-                <User className="w-4 h-4" />
+                <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </Link>
 
               {/* Customer Support */}
               <Link
                 href="/support"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all"
+                className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all whitespace-nowrap"
               >
                 <HelpCircle className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
                 <span>Support</span>
@@ -145,19 +141,19 @@ export function Header() {
               {/* Primary Sell CTA */}
               <Link
                 href="/sell"
-                className="relative inline-flex items-center justify-center px-4 py-2 text-xs sm:text-sm font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-emerald-400 rounded-xl shadow-md shadow-cyan-500/20 hover:shadow-cyan-500/35 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                className="relative inline-flex items-center justify-center px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-emerald-400 rounded-xl shadow-md shadow-cyan-500/20 hover:shadow-cyan-500/35 hover:scale-[1.02] active:scale-[0.98] transition-all whitespace-nowrap shrink-0"
               >
-                <Zap className="w-3.5 h-3.5 mr-1.5 fill-slate-950" />
+                <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1 sm:mr-1.5 fill-slate-950" />
                 <span>Sell Device</span>
               </Link>
 
               {/* Mobile Hamburger Toggle */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+                className="md:hidden p-1.5 sm:p-2 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shrink-0"
                 aria-label="Toggle menu"
               >
-                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                {mobileMenuOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
             </div>
           </div>

@@ -78,12 +78,12 @@ export default function CategoryBrandsPage() {
               href={`/sell/${categorySlug}/${b.slug}`}
               className="p-5 rounded-2xl bg-slate-900/70 hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/40 transition-all flex flex-col items-center justify-center text-center group glass-panel"
             >
-              <div className="w-14 h-14 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center p-2.5 mb-3 group-hover:scale-110 transition-transform">
+              <div className="w-full h-16 sm:h-20 rounded-xl bg-slate-950/90 border border-slate-800/80 flex items-center justify-center px-3 py-2 mb-3 group-hover:scale-105 group-hover:border-cyan-500/40 transition-all">
                 {b.logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={b.logoUrl} alt={b.name} className="max-h-full max-w-full object-contain filter invert opacity-90 group-hover:opacity-100" />
+                  <img src={b.logoUrl} alt={b.name} className="w-auto h-auto max-h-12 max-w-[85%] object-contain" />
                 ) : (
-                  <span className="font-bold text-base text-cyan-400">{b.name.charAt(0)}</span>
+                  <span className="font-extrabold text-base text-cyan-400">{b.name}</span>
                 )}
               </div>
               <span className="text-xs font-bold text-white group-hover:text-cyan-300">

@@ -233,14 +233,9 @@ function SellPageContent() {
         }
         if (qData.success) {
           setQuestions(qData.data);
-          // Set first answer as default for every question
-          const initialAnswers: Record<string, string> = {};
-          qData.data.forEach((q: Question) => {
-            if (q.answers && q.answers.length > 0) {
-              initialAnswers[q.code] = q.answers[0].code;
-            }
-          });
-          setAnswers(initialAnswers);
+          // Do not pre-fill answers by default - let customer select their own device condition
+          setAnswers({});
+          setCurrentQuestionIdx(0);
         }
       } catch (e) {
         console.error(e);
@@ -461,21 +456,26 @@ function SellPageContent() {
                 {brands.map((b) => (
                   <button
                     key={b.id}
+                    type="button"
                     onClick={() => {
                       setSelectedBrand(b);
                       setCurrentStep(3);
                     }}
-                    className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-900 transition-all flex flex-col items-center justify-center text-center space-y-2 group"
+                    className="p-3.5 sm:p-4 rounded-2xl bg-slate-950/90 border border-slate-800 hover:border-emerald-500/60 hover:bg-slate-900 transition-all flex flex-col items-center justify-center text-center space-y-2.5 group hover:shadow-lg hover:shadow-emerald-500/10"
                   >
-                    <div className="w-14 h-14 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center p-2 overflow-hidden group-hover:scale-105 transition-transform">
+                    <div className="w-full h-16 sm:h-20 rounded-xl bg-slate-900/90 border border-slate-800/80 flex items-center justify-center px-3 py-2 overflow-hidden group-hover:scale-105 group-hover:border-slate-700 transition-all">
                       {b.logoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={b.logoUrl} alt={b.name} className="max-h-full max-w-full object-contain" />
+                        <img
+                          src={b.logoUrl}
+                          alt={b.name}
+                          className="w-auto h-auto max-h-12 max-w-[85%] object-contain"
+                        />
                       ) : (
-                        <span className="font-bold text-base text-cyan-400">{b.name.charAt(0)}</span>
+                        <span className="font-extrabold text-base text-cyan-400">{b.name}</span>
                       )}
                     </div>
-                    <div className="text-xs font-bold text-white group-hover:text-emerald-300">
+                    <div className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors">
                       {b.name}
                     </div>
                   </button>
@@ -676,6 +676,22 @@ function SellPageContent() {
                         const isSelected = answers[currentQ.code] === ans.code;
                         const isNegative = ans.adjustmentValue < 0;
                         const isPositive = ans.adjustmentValue > 0;
+                        const isPercentage = ans.adjustmentType === 'PERCENTAGE';
+
+                        let adjustmentLabel = '₹0';
+                        if (isPercentage) {
+                          if (ans.adjustmentValue < 0) {
+                            adjustmentLabel = `${Math.abs(ans.adjustmentValue)}% will be deducted`;
+                          } else if (ans.adjustmentValue > 0) {
+                            adjustmentLabel = `+${ans.adjustmentValue}% bonus`;
+                          }
+                        } else {
+                          if (ans.adjustmentValue < 0) {
+                            adjustmentLabel = `-₹${Math.abs(ans.adjustmentValue).toLocaleString('en-IN')}`;
+                          } else if (ans.adjustmentValue > 0) {
+                            adjustmentLabel = `+₹${ans.adjustmentValue.toLocaleString('en-IN')}`;
+                          }
+                        }
 
                         return (
                           <button
@@ -715,7 +731,7 @@ function SellPageContent() {
                                 isNegative ? 'text-rose-400' : isPositive ? 'text-emerald-400' : 'text-slate-500'
                               }`}
                             >
-                              {ans.adjustmentValue > 0 ? `+₹${ans.adjustmentValue}` : ans.adjustmentValue < 0 ? `-₹${Math.abs(ans.adjustmentValue)}` : '₹0'}
+                              {adjustmentLabel}
                             </div>
                           </button>
                         );
@@ -807,14 +823,26 @@ function SellPageContent() {
                         <div key={i} className="flex justify-between items-start py-0.5">
                           <span className={`text-[11px] flex items-center gap-1.5 ${isNeg ? 'text-rose-300' : 'text-emerald-300'}`}>
                             {isNeg ? <X className="w-3 h-3 text-rose-400 shrink-0" /> : <Check className="w-3 h-3 text-emerald-400 shrink-0" />}
-                            <span className="truncate max-w-[210px]">{adj.answerLabel}</span>
+                            <span className="truncate max-w-[200px]">{adj.answerLabel}</span>
                           </span>
-                          <span className={`font-mono font-bold text-[11px] ${isNeg ? 'text-rose-400' : 'text-emerald-400'}`}>
-                            {isPos ? `+₹${adj.calculatedAmount}` : `-₹${Math.abs(adj.calculatedAmount)}`}
+                          <span className={`font-mono font-bold text-[11px] shrink-0 ${isNeg ? 'text-rose-400' : 'text-emerald-400'}`}>
+                            {adj.adjustmentType === 'PERCENTAGE'
+                              ? isNeg
+                                ? `-${Math.abs(adj.adjustmentValue)}% (-₹${Math.abs(adj.calculatedAmount).toLocaleString('en-IN')})`
+                                : `+${adj.adjustmentValue}% (+₹${adj.calculatedAmount.toLocaleString('en-IN')})`
+                              : isPos
+                              ? `+₹${adj.calculatedAmount.toLocaleString('en-IN')}`
+                              : `-₹${Math.abs(adj.calculatedAmount).toLocaleString('en-IN')}`}
                           </span>
                         </div>
                       );
                     })}
+
+                    {valuationResult.adjustments.filter((a: any) => a.calculatedAmount !== 0).length === 0 && (
+                      <div className="py-2 px-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400">
+                        Answer condition questions to view line-by-line price adjustments.
+                      </div>
+                    )}
 
                     {appliedCoupon && (
                       <div className="flex justify-between items-center py-1 text-emerald-400 font-bold border-t border-slate-800">

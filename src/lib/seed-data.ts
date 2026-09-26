@@ -155,7 +155,7 @@ export const SEED_BRANDS: SeedBrand[] = [
     "categoryId": "cat_laptop",
     "name": "Apple MacBook",
     "slug": "apple-macbook",
-    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg",
+    "logoUrl": "/brands/apple.svg",
     "isPopular": true,
     "displayOrder": 1
   },
@@ -164,7 +164,7 @@ export const SEED_BRANDS: SeedBrand[] = [
     "categoryId": "cat_laptop",
     "name": "Dell",
     "slug": "dell",
-    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/4/48/Dell_Logo.svg",
+    "logoUrl": "/brands/dell.svg",
     "isPopular": true,
     "displayOrder": 2
   },
@@ -173,7 +173,7 @@ export const SEED_BRANDS: SeedBrand[] = [
     "categoryId": "cat_laptop",
     "name": "HP",
     "slug": "hp",
-    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/a/ad/HP_logo_2012.svg",
+    "logoUrl": "/brands/hp.svg",
     "isPopular": true,
     "displayOrder": 3
   },
@@ -182,7 +182,7 @@ export const SEED_BRANDS: SeedBrand[] = [
     "categoryId": "cat_laptop",
     "name": "Lenovo",
     "slug": "lenovo",
-    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Lenovo_logo_2015.svg",
+    "logoUrl": "/brands/lenovo.svg",
     "isPopular": true,
     "displayOrder": 4
   },
@@ -191,7 +191,7 @@ export const SEED_BRANDS: SeedBrand[] = [
     "categoryId": "cat_laptop",
     "name": "ASUS",
     "slug": "asus",
-    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/2/2e/ASUS_Logo.svg",
+    "logoUrl": "/brands/asus.svg",
     "isPopular": true,
     "displayOrder": 5
   },
@@ -200,7 +200,7 @@ export const SEED_BRANDS: SeedBrand[] = [
     "categoryId": "cat_laptop",
     "name": "Acer",
     "slug": "acer",
-    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/0/00/Acer_2011.svg",
+    "logoUrl": "/brands/acer.svg",
     "isPopular": true,
     "displayOrder": 6
   },
@@ -209,7 +209,7 @@ export const SEED_BRANDS: SeedBrand[] = [
     "categoryId": "cat_laptop",
     "name": "MSI",
     "slug": "msi",
-    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b3/MSI_logo.svg",
+    "logoUrl": "/brands/msi.svg",
     "isPopular": true,
     "displayOrder": 7
   },
@@ -218,7 +218,7 @@ export const SEED_BRANDS: SeedBrand[] = [
     "categoryId": "cat_laptop",
     "name": "Samsung Galaxy Book",
     "slug": "samsung-galaxy-book",
-    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/2/24/Samsung_Logo.svg",
+    "logoUrl": "/brands/samsung.svg",
     "isPopular": false,
     "displayOrder": 8
   },
@@ -227,7 +227,7 @@ export const SEED_BRANDS: SeedBrand[] = [
     "categoryId": "cat_laptop",
     "name": "Microsoft Surface",
     "slug": "microsoft-surface",
-    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/9/96/Microsoft_logo_%282012%29.svg",
+    "logoUrl": "/brands/microsoft.svg",
     "isPopular": false,
     "displayOrder": 9
   },
@@ -236,7 +236,7 @@ export const SEED_BRANDS: SeedBrand[] = [
     "categoryId": "cat_laptop",
     "name": "LG Gram",
     "slug": "lg-gram",
-    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/b/bf/LG_logo_%282015%29.svg",
+    "logoUrl": "/brands/lg.svg",
     "isPopular": false,
     "displayOrder": 10
   },
@@ -245,7 +245,7 @@ export const SEED_BRANDS: SeedBrand[] = [
     "categoryId": "cat_laptop",
     "name": "Razer Blade",
     "slug": "razer-blade",
-    "logoUrl": "https://upload.wikimedia.org/wikipedia/en/4/40/Razer_snake_logo.svg",
+    "logoUrl": "/brands/razer.svg",
     "isPopular": false,
     "displayOrder": 11
   },
@@ -254,7 +254,7 @@ export const SEED_BRANDS: SeedBrand[] = [
     "categoryId": "cat_laptop",
     "name": "Gigabyte AORUS",
     "slug": "gigabyte-aorus",
-    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/8/87/Gigabyte_Technology_logo.svg",
+    "logoUrl": "/brands/gigabyte.svg",
     "isPopular": false,
     "displayOrder": 12
   },
@@ -263,7 +263,7 @@ export const SEED_BRANDS: SeedBrand[] = [
     "categoryId": "cat_laptop",
     "name": "Xiaomi Mi Notebook",
     "slug": "xiaomi-mi-notebook",
-    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/a/ae/Xiaomi_logo_%282021-%29.svg",
+    "logoUrl": "/brands/xiaomi.svg",
     "isPopular": false,
     "displayOrder": 13
   },
@@ -272,7 +272,7 @@ export const SEED_BRANDS: SeedBrand[] = [
     "categoryId": "cat_laptop",
     "name": "Infinix ZERO Book",
     "slug": "infinix-zero-book",
-    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/9/91/Infinix_Mobility_logo.png",
+    "logoUrl": "/brands/infinix.svg",
     "isPopular": false,
     "displayOrder": 14
   },
@@ -326,7 +326,7 @@ export const SEED_BRANDS: SeedBrand[] = [
     "categoryId": "cat_smartphone",
     "name": "Redmi",
     "slug": "redmi",
-    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b3/Redmi_Logo.svg",
+    "logoUrl": "/brands/redmi.svg",
     "isPopular": true,
     "displayOrder": 5
   },

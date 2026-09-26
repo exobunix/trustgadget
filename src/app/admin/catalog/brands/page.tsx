@@ -192,12 +192,12 @@ export default function AdminBrandsPage() {
             key={b.id}
             className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col items-center justify-between text-center glass-panel space-y-2 hover:border-slate-700 transition-all"
           >
-            <div className="w-16 h-16 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center p-2.5 mb-1 overflow-hidden">
+            <div className="w-full h-16 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-center px-3 py-2 mb-1 overflow-hidden">
               {b.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={b.logoUrl} alt={b.name} className="max-h-full max-w-full object-contain" />
+                <img src={b.logoUrl} alt={b.name} className="w-auto h-auto max-h-12 max-w-[85%] object-contain" />
               ) : (
-                <span className="font-bold text-lg text-cyan-400">{b.name.charAt(0)}</span>
+                <span className="font-extrabold text-base text-cyan-400">{b.name}</span>
               )}
             </div>
             <div>
