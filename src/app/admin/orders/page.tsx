@@ -18,7 +18,10 @@ import {
   RefreshCw,
   X,
   Smartphone,
+  Check,
+  Zap,
 } from 'lucide-react';
+import { triggerWebNotification } from '@/lib/notifications';
 
 const STATUS_LIST = [
   'ALL',
@@ -42,6 +45,7 @@ export default function AdminOrdersPage() {
   const [newStatus, setNewStatus] = useState('');
   const [newAgent, setNewAgent] = useState('');
   const [statusNote, setStatusNote] = useState('');
+  const [verifiedPrice, setVerifiedPrice] = useState<number | string>('');
   const [updating, setUpdating] = useState(false);
 
   // Inspect full details modal
@@ -74,22 +78,29 @@ export default function AdminOrdersPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleUpdateStatus = async () => {
+  const handleUpdateStatus = async (overrideStatus?: string, customNote?: string) => {
     if (!selectedOrder) return;
+    const targetStatus = overrideStatus || newStatus || selectedOrder.status;
+    const note = customNote || statusNote || `Status updated to ${targetStatus}`;
     setUpdating(true);
     try {
       const res = await fetch(`/api/orders/${selectedOrder.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          status: newStatus || selectedOrder.status,
+          status: targetStatus,
           assignedAgent: newAgent || selectedOrder.assignedAgent,
-          statusNote: statusNote || `Status updated to ${newStatus || selectedOrder.status}`,
+          statusNote: note,
+          finalVerifiedPrice: verifiedPrice !== '' ? Number(verifiedPrice) : undefined,
           adminName: 'Super Admin',
         }),
       });
       const data = await res.json();
       if (data.success) {
+        triggerWebNotification(`Order ${selectedOrder.orderNumber}: ${targetStatus.replace(/_/g, ' ')}`, {
+          body: `Order status updated. Customer track section updated in real-time!`,
+          soundType: 'order',
+        });
         setSelectedOrder(null);
         await fetchOrders();
       }
@@ -265,10 +276,12 @@ export default function AdminOrdersPage() {
                           setSelectedOrder(ord);
                           setNewStatus(ord.status);
                           setNewAgent(ord.assignedAgent || '');
+                          setVerifiedPrice(ord.finalVerifiedPrice ? String(ord.finalVerifiedPrice) : String(ord.estimatedPrice));
+                          setStatusNote('');
                         }}
-                        className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium"
+                        className="px-2.5 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[11px] font-bold shadow-sm transition-all"
                       >
-                        Status
+                        Manage
                       </button>
                       <Link
                         href={`/admin/verification?orderId=${ord.id}`}
@@ -419,74 +432,211 @@ export default function AdminOrdersPage() {
         </div>
       )}
 
-      {/* Status / Agent Update Modal */}
+      {/* Order Management Modal (Screenshot 5 Match) */}
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-3xl p-6 glass-panel space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-base font-bold text-white">
-                Update Order: <span className="text-cyan-400 font-mono">{selectedOrder.orderNumber}</span>
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+          <div className="w-full max-w-2xl bg-slate-900 border border-slate-700/80 rounded-3xl p-6 sm:p-8 glass-panel space-y-6 shadow-2xl max-h-[92vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-start justify-between pb-3 border-b border-slate-800">
+              <div>
+                <span className="text-xs text-slate-400 font-semibold">Order Management</span>
+                <h2 className="text-xl sm:text-2xl font-black text-white font-mono mt-0.5">
+                  {selectedOrder.orderNumber}
+                </h2>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="px-3 py-0.5 rounded-full text-[11px] font-bold bg-purple-950/80 text-purple-300 border border-purple-500/30">
+                    Sell
+                  </span>
+                  <span className="px-3 py-0.5 rounded-full text-[11px] font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-500/30">
+                    {selectedOrder.status.replace(/_/g, ' ')}
+                  </span>
+                </div>
+              </div>
               <button
                 onClick={() => setSelectedOrder(null)}
-                className="text-slate-400 hover:text-white text-xs"
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
               >
-                ✕ Close
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Pipeline Status</label>
+            {/* Change Order Status Panel (Screenshot 5 Match) */}
+            <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white flex items-center gap-2">
+                  <Filter className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Change Order Status</span>
+                </span>
+                <span className="text-[11px] font-mono text-emerald-400 font-bold">
+                  Current: {selectedOrder.status.replace(/_/g, ' ')}
+                </span>
+              </div>
+
+              {/* Quick Status Buttons Row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => handleUpdateStatus('PICKUP_SCHEDULED', 'Executive assigned and doorstep pickup scheduled')}
+                  disabled={updating}
+                  className="px-3 py-2.5 rounded-xl border border-cyan-500/40 bg-cyan-950/30 hover:bg-cyan-950/70 text-cyan-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Accept</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleUpdateStatus('COLLECTED', 'Executive inspected and collected device from customer doorstep')}
+                  disabled={updating}
+                  className="px-3 py-2.5 rounded-xl border border-amber-500/40 bg-amber-950/30 hover:bg-amber-950/70 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                >
+                  <Truck className="w-3.5 h-3.5" />
+                  <span>Picked Up</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleUpdateStatus('IN_VERIFICATION', 'Device is undergoing physical and diagnostic verification')}
+                  disabled={updating}
+                  className="px-3 py-2.5 rounded-xl border border-purple-500/40 bg-purple-950/30 hover:bg-purple-950/70 text-purple-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  <span>Inspection</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleUpdateStatus('PAYMENT_COMPLETED', 'Doorstep IMPS/UPI payment transferred successfully')}
+                  disabled={updating}
+                  className="px-3 py-2.5 rounded-xl border border-emerald-500/40 bg-emerald-950/30 hover:bg-emerald-950/70 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Complete</span>
+                </button>
+              </div>
+
+              {/* Status Dropdown Selector */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
+                <span className="text-xs font-semibold text-slate-400 shrink-0">All Statuses:</span>
                 <select
                   value={newStatus}
                   onChange={(e) => setNewStatus(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white"
+                  className="w-full px-3.5 py-2 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white font-bold focus:outline-none focus:border-emerald-500"
                 >
-                  {STATUS_LIST.filter((s) => s !== 'ALL').map((s) => (
-                    <option key={s} value={s}>
-                      {s.replace('_', ' ')}
+                  {STATUS_LIST.filter((s) => s !== 'ALL').map((st) => (
+                    <option key={st} value={st}>
+                      {st.replace(/_/g, ' ')}
                     </option>
                   ))}
                 </select>
               </div>
+            </div>
 
+            {/* Customer & Device Information (Screenshot 5 Match) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              {/* Customer Box */}
+              <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-2">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Customer
+                </div>
+                <div className="font-bold text-sm text-white">{selectedOrder.customerName}</div>
+                <div className="text-slate-300 font-mono">+91 {selectedOrder.customerPhone}</div>
+                <div className="text-slate-400 leading-snug">
+                  {selectedOrder.pickupAddress}, {selectedOrder.pickupCity}
+                </div>
+                <div className="text-slate-500 font-mono">PIN: {selectedOrder.pickupPincode}</div>
+              </div>
+
+              {/* Device Box */}
+              <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-2">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Device
+                </div>
+                <div className="font-bold text-sm text-white">
+                  {selectedOrder.modelName} {selectedOrder.variantName}
+                </div>
+                <div className="text-cyan-400 text-xs">
+                  {selectedOrder.brandName} • {selectedOrder.categoryName}
+                </div>
+                <div className="text-slate-300">
+                  Pickup: <strong className="text-white">{selectedOrder.pickupDate}</strong>
+                </div>
+                <div className="text-slate-400 font-mono text-[11px]">
+                  Slot: {selectedOrder.pickupTimeSlot}
+                </div>
+              </div>
+            </div>
+
+            {/* Pricing Box (Screenshot 5 Match) */}
+            <div className="p-5 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-3">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Pricing
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="text-slate-400 text-xs">Quoted Price</div>
+                  <div className="text-xl font-extrabold text-white font-mono mt-0.5">
+                    ₹{selectedOrder.estimatedPrice?.toLocaleString('en-IN')}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-slate-400 text-xs">Final Inspected Price (₹)</div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <input
+                      type="number"
+                      placeholder={selectedOrder.finalVerifiedPrice ? String(selectedOrder.finalVerifiedPrice) : String(selectedOrder.estimatedPrice)}
+                      value={verifiedPrice}
+                      onChange={(e) => setVerifiedPrice(e.target.value)}
+                      className="px-3 py-1.5 w-36 rounded-xl bg-slate-900 border border-slate-700 text-emerald-400 font-bold font-mono text-sm focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Agent & Status Transition Note */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Assign Field Agent</label>
+                <label className="block text-slate-400 mb-1 font-semibold">Assigned Executive</label>
                 <input
                   type="text"
-                  placeholder="e.g. Kiran Patel (Senior Field Inspector)"
+                  placeholder="e.g. Ramesh Kumar (Doorstep Agent)"
                   value={newAgent}
                   onChange={(e) => setNewAgent(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Status Transition Note</label>
+                <label className="block text-slate-400 mb-1 font-semibold">Status Update Note</label>
                 <input
                   type="text"
-                  placeholder="e.g. Agent dispatched to customer residence"
+                  placeholder="e.g. Executive dispatched for collection"
                   value={statusNote}
                   onChange={(e) => setStatusNote(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white"
                 />
               </div>
             </div>
 
-            <div className="pt-3 flex justify-end gap-3 border-t border-slate-800">
+            {/* Footer Buttons */}
+            <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-800">
               <button
+                type="button"
                 onClick={() => setSelectedOrder(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
+                className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition-colors"
               >
-                Cancel
+                Close
               </button>
               <button
-                onClick={handleUpdateStatus}
+                type="button"
+                onClick={() => handleUpdateStatus()}
                 disabled={updating}
-                className="px-6 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 text-xs font-bold shadow-md disabled:opacity-50"
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xs shadow-md shadow-emerald-500/20 disabled:opacity-50 transition-all flex items-center gap-1.5"
               >
-                {updating ? 'Saving...' : 'Save Updates'}
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{updating ? 'Updating...' : 'Save & Sync Status'}</span>
               </button>
             </div>
           </div>

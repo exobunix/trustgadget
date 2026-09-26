@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   ShieldCheck,
@@ -13,6 +13,24 @@ import {
 } from 'lucide-react';
 
 export function Footer() {
+  const [settings, setSettings] = useState<Record<string, string>>({
+    support_phone: '1800 209 8899',
+    support_hours: 'Mon-Sun 9AM-8PM',
+    support_email: 'help@trustmygadget.com',
+    office_address: 'Cyber City, Phase II, Gurugram, NCR, India',
+    company_name: 'TrustMyGadget Technologies India Pvt Ltd',
+  });
+
+  useEffect(() => {
+    fetch('/api/cms/settings')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data) {
+          setSettings((prev) => ({ ...prev, ...data.data }));
+        }
+      })
+      .catch(() => {});
+  }, []);
   return (
     <footer className="bg-slate-100 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-sm transition-colors duration-200">
       {/* Upper Trust Strip */}
@@ -83,15 +101,15 @@ export function Footer() {
             <div className="pt-2 flex flex-col space-y-2 text-xs text-slate-600 dark:text-slate-300">
               <div className="flex items-center gap-2">
                 <Phone className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
-                <span>1800 209 8899 (Toll-Free Mon-Sun 9AM-8PM)</span>
+                <span>{settings.support_phone} ({settings.support_hours || 'Toll-Free Mon-Sun 9AM-8PM'})</span>
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
-                <span>support@trustmygadget.com</span>
+                <span>{settings.support_email}</span>
               </div>
               <div className="flex items-center gap-2">
                 <MapPin className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
-                <span>Cyber City, Phase II, Gurugram, NCR, India</span>
+                <span>{settings.office_address}</span>
               </div>
             </div>
           </div>

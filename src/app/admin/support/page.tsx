@@ -14,6 +14,7 @@ import {
   Filter,
   ShieldCheck,
 } from 'lucide-react';
+import { triggerWebNotification } from '@/lib/notifications';
 
 export default function AdminSupportConsolePage() {
   const [tickets, setTickets] = useState<any[]>([]);
@@ -81,6 +82,10 @@ export default function AdminSupportConsolePage() {
         setReplyText('');
         loadTicketMessages(activeTicket.id);
         fetchTickets();
+        triggerWebNotification(`Support Reply Sent`, {
+          body: `Message dispatched to customer for ticket #${activeTicket.ticketNumber}`,
+          soundType: 'support',
+        });
       }
     } catch (e) {
       console.error(e);
@@ -99,6 +104,10 @@ export default function AdminSupportConsolePage() {
       });
       setActiveTicket((prev: any) => ({ ...prev, status }));
       fetchTickets();
+      triggerWebNotification(`Ticket #${activeTicket.ticketNumber} Updated`, {
+        body: `Ticket marked as ${status}`,
+        soundType: 'support',
+      });
     } catch (e) {
       console.error(e);
     }

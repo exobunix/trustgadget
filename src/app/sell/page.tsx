@@ -332,6 +332,9 @@ function SellPageContent() {
     };
 
     localStorage.setItem('tmg_current_tradein', JSON.stringify(tradeInState));
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('tmg_checkout_order', JSON.stringify(tradeInState));
+    }
     router.push('/checkout');
   };
 
@@ -399,7 +402,7 @@ function SellPageContent() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 {categories.map((cat) => (
                   <button
                     key={cat.id}
@@ -407,21 +410,21 @@ function SellPageContent() {
                       setSelectedCategory(cat);
                       setCurrentStep(2);
                     }}
-                    className="p-5 rounded-3xl bg-slate-950 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-900/90 transition-all flex flex-col items-center justify-between text-center group space-y-3"
+                    className="p-5 sm:p-6 rounded-3xl bg-slate-950/90 border border-slate-800 hover:border-emerald-500/60 hover:bg-slate-900/90 hover:shadow-xl hover:shadow-emerald-500/10 transition-all flex flex-col items-center justify-between text-center group space-y-4"
                   >
-                    <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden flex items-center justify-center p-1 group-hover:scale-105 transition-transform">
+                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800/80 p-2.5 overflow-hidden flex items-center justify-center group-hover:scale-105 group-hover:border-emerald-500/40 transition-all shadow-md">
                       {cat.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={cat.imageUrl} alt={cat.name} className="w-full h-full object-cover rounded-xl" />
+                        <img src={cat.imageUrl} alt={cat.name} className="w-full h-full object-contain filter drop-shadow-md rounded-xl" />
                       ) : (
-                        <Smartphone className="w-8 h-8 text-cyan-400" />
+                        <Smartphone className="w-12 h-12 text-emerald-400" />
                       )}
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors">
+                      <div className="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-300 transition-colors">
                         {cat.name}
                       </div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">Top Brands</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">Top Brands & Instant Cash</div>
                     </div>
                   </button>
                 ))}

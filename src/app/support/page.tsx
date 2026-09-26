@@ -15,6 +15,7 @@ import {
   ChevronRight,
   ArrowLeft,
 } from 'lucide-react';
+import { triggerWebNotification } from '@/lib/notifications';
 
 export default function CustomerSupportPage() {
   const [phoneQuery, setPhoneQuery] = useState('');
@@ -84,6 +85,10 @@ export default function CustomerSupportPage() {
       if (data.success) {
         setReplyText('');
         loadTicketConversation(activeTicket.id);
+        triggerWebNotification(`Message Sent to Support`, {
+          body: `Your message was delivered to our support team.`,
+          soundType: 'support',
+        });
       }
     } catch (e) {
       console.error(e);
@@ -126,6 +131,11 @@ export default function CustomerSupportPage() {
           },
           ...prev,
         ]);
+
+        triggerWebNotification(`Support Ticket #${data.data.ticketNumber} Raised`, {
+          body: `Your ticket for "${subject}" has been assigned to our customer support desk.`,
+          soundType: 'support',
+        });
       }
     } catch (e) {
       console.error(e);

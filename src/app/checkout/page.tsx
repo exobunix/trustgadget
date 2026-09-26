@@ -19,7 +19,10 @@ import {
   User,
   Phone,
   Mail,
+  Lock,
+  LogIn,
 } from 'lucide-react';
+import { triggerWebNotification } from '@/lib/notifications';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -28,6 +31,15 @@ export default function CheckoutPage() {
   const [step, setStep] = useState<number>(1);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Customer Authentication state
+  const [loggedInUser, setLoggedInUser] = useState<any>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authName, setAuthName] = useState('');
+  const [authPhone, setAuthPhone] = useState('');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [authError, setAuthError] = useState('');
 
   // Form State
   const [customerName, setCustomerName] = useState('');
@@ -53,24 +65,37 @@ export default function CheckoutPage() {
 
   const [agreedToTerms, setAgreedToTerms] = useState(true);
 
-  // Load valuation summary from sessionStorage
+  // Load user and trade-in device summary
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const stored = sessionStorage.getItem('tmg_checkout_order');
-      if (stored) {
-        setOrderSummary(JSON.parse(stored));
+      // 1. Check logged in customer
+      const storedUser = localStorage.getItem('tmg_customer_user');
+      if (storedUser) {
+        try {
+          const u = JSON.parse(storedUser);
+          setLoggedInUser(u);
+          setCustomerName(u.name || '');
+          setCustomerPhone(u.phone || '');
+          setCustomerEmail(u.email || '');
+        } catch (e) {
+          setShowAuthModal(true);
+        }
       } else {
-        // Fallback demo order if direct URL accessed
-        setOrderSummary({
-          categoryName: 'Smartphones',
-          brandName: 'Apple',
-          modelName: 'iPhone 15 Pro Max',
-          variantName: '256 GB',
-          deviceImageUrl: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80',
-          basePrice: 78000,
-          estimatedPrice: 79200,
-          conditionSummary: { PHONE_POWER: 'YES', PHONE_DISPLAY_TOUCH: 'PERFECT' },
-        });
+        setShowAuthModal(true);
+      }
+
+      // 2. Load user's actual selected selling device
+      const localData = localStorage.getItem('tmg_current_tradein');
+      const sessionData = sessionStorage.getItem('tmg_checkout_order');
+      const activeData = localData || sessionData;
+
+      if (activeData) {
+        try {
+          const parsed = JSON.parse(activeData);
+          setOrderSummary(parsed);
+        } catch (e) {
+          console.error(e);
+        }
       }
 
       // Default pickup date to tomorrow
@@ -79,6 +104,47 @@ export default function CheckoutPage() {
       setPickupDate(tomorrow.toISOString().split('T')[0]);
     }
   }, []);
+
+  const handleCustomerAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    if (!authPhone || authPhone.replace(/[^0-9]/g, '').length < 10) {
+      setAuthError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    if (!authName.trim()) {
+      setAuthError('Please enter your full name.');
+      return;
+    }
+
+    setAuthSubmitting(true);
+    try {
+      const res = await fetch('/api/auth/customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: authName.trim(),
+          phone: authPhone.trim(),
+          email: authEmail.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setLoggedInUser(data.data);
+        localStorage.setItem('tmg_customer_user', JSON.stringify(data.data));
+        setCustomerName(data.data.name || authName);
+        setCustomerPhone(data.data.phone || authPhone);
+        if (data.data.email) setCustomerEmail(data.data.email);
+        setShowAuthModal(false);
+      } else {
+        setAuthError(data.error || 'Authentication failed. Please try again.');
+      }
+    } catch (err: any) {
+      setAuthError(err.message || 'Network error.');
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
 
   // Quick Indian date generator for slots
   const availableDates = Array.from({ length: 5 }).map((_, i) => {
@@ -135,6 +201,12 @@ export default function CheckoutPage() {
   };
 
   const handleConfirmOrder = async () => {
+    if (!loggedInUser) {
+      setShowAuthModal(true);
+      setErrorMsg('Please login or signup to confirm your booking and track your order.');
+      return;
+    }
+
     if (!agreedToTerms) {
       setErrorMsg('Please accept the terms and conditions.');
       return;
@@ -144,9 +216,10 @@ export default function CheckoutPage() {
 
     try {
       const payload = {
-        customerName,
-        customerPhone,
-        customerEmail: customerEmail || `${customerPhone.replace(/[^0-9]/g, '')}@trustmygadget.user`,
+        userId: loggedInUser.id,
+        customerName: customerName || loggedInUser.name,
+        customerPhone: customerPhone || loggedInUser.phone,
+        customerEmail: customerEmail || loggedInUser.email || `${(customerPhone || loggedInUser.phone).replace(/[^0-9]/g, '')}@trustmygadget.user`,
         categoryName: orderSummary?.categoryName || 'Smartphones',
         brandName: orderSummary?.brandName || 'Apple',
         modelName: orderSummary?.modelName || 'Device',
@@ -180,7 +253,15 @@ export default function CheckoutPage() {
       if (data.success) {
         if (typeof window !== 'undefined') {
           sessionStorage.removeItem('tmg_checkout_order');
+          localStorage.removeItem('tmg_current_tradein');
         }
+
+        // Trigger web notification and audible chime
+        triggerWebNotification(`Order Confirmed: ${data.data.orderNumber}`, {
+          body: `Pickup scheduled for ${payload.modelName} on ${payload.pickupDate}. Payout: ₹${payload.estimatedPrice.toLocaleString('en-IN')}`,
+          soundType: 'order',
+        });
+
         router.push(`/order-confirmed/${data.data.orderNumber}`);
       } else {
         setErrorMsg(data.error || 'Unable to place order. Please try again.');
@@ -236,6 +317,58 @@ export default function CheckoutPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Customer Auth Profile Bar */}
+      <div className="mb-6 p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 glass-panel">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-cyan-950/80 border border-cyan-500/30 text-cyan-400 flex items-center justify-center shrink-0">
+            <User className="w-5 h-5" />
+          </div>
+          <div>
+            {loggedInUser ? (
+              <>
+                <div className="text-xs font-bold text-white flex items-center gap-2">
+                  <span>Logged in as: {loggedInUser.name}</span>
+                  <span className="text-[10px] bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                    Verified
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  {loggedInUser.phone} • Orders will sync automatically to your tracking dashboard.
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5" /> Login / Signup Required
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Please sign in with your mobile number to link your booking for live tracking and payments.
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (loggedInUser) {
+              setAuthName(loggedInUser.name || '');
+              setAuthPhone(loggedInUser.phone || '');
+              setAuthEmail(loggedInUser.email || '');
+            }
+            setShowAuthModal(true);
+          }}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+            loggedInUser
+              ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+              : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20'
+          }`}
+        >
+          {loggedInUser ? 'Change Profile' : 'Login / Sign Up'}
+        </button>
       </div>
 
       {errorMsg && (
@@ -707,6 +840,114 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {/* Customer Login / Signup Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl relative space-y-5">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center">
+                  <LogIn className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">Login or Quick Sign Up</h3>
+                  <p className="text-xs text-slate-400">Required to link order & enable live tracking</p>
+                </div>
+              </div>
+              {loggedInUser && (
+                <button
+                  type="button"
+                  onClick={() => setShowAuthModal(false)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Enter your mobile number and name so our doorstep executive can coordinate your pickup and you can monitor order progress in the <strong className="text-emerald-400">Track Order</strong> section.
+            </p>
+
+            {authError && (
+              <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{authError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCustomerAuth} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Rahul Sharma"
+                  value={authName}
+                  onChange={(e) => setAuthName(e.target.value)}
+                  className="w-full px-4 py-3 text-xs bg-slate-950 border border-slate-700 rounded-xl text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Mobile Number (For OTP / Agent Call) *
+                </label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-3.5 text-xs bg-slate-800 border border-r-0 border-slate-700 rounded-l-xl text-slate-300 font-bold">
+                    +91
+                  </span>
+                  <input
+                    type="tel"
+                    required
+                    maxLength={10}
+                    placeholder="9876543210"
+                    value={authPhone}
+                    onChange={(e) => setAuthPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                    className="w-full px-4 py-3 text-xs bg-slate-950 border border-slate-700 rounded-r-xl text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Email Address (Optional)
+                </label>
+                <input
+                  type="email"
+                  placeholder="name@example.com"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  className="w-full px-4 py-3 text-xs bg-slate-950 border border-slate-700 rounded-xl text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3">
+                {loggedInUser && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAuthModal(false)}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={authSubmitting}
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{authSubmitting ? 'Verifying...' : 'Save & Continue to Checkout'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

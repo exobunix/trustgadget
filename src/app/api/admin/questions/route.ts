@@ -105,3 +105,64 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, title, subtitle, categoryId, code, isActive, displayOrder, adminName } = body;
+
+    if (!id || !title) {
+      return NextResponse.json({ success: false, error: 'Question ID and title are required' }, { status: 400 });
+    }
+
+    db.prepare(`
+      UPDATE questions
+      SET title = ?,
+          subtitle = ?,
+          categoryId = ?,
+          code = COALESCE(?, code),
+          isActive = COALESCE(?, isActive),
+          displayOrder = COALESCE(?, displayOrder),
+          updatedAt = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(
+      title,
+      subtitle || null,
+      categoryId || null,
+      code || null,
+      isActive !== undefined ? (isActive ? 1 : 0) : null,
+      displayOrder !== undefined ? displayOrder : null,
+      id
+    );
+
+    dbHelpers.createAuditLog({
+      adminName: adminName || 'Admin User',
+      action: 'UPDATE_QUESTION',
+      entityType: 'Question',
+      entityId: id,
+      details: `Updated question "${title}" (category: ${categoryId || 'All'})`,
+    });
+
+    return NextResponse.json({ success: true, message: 'Question updated successfully' });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Question ID required' }, { status: 400 });
+    }
+
+    dbHelpers.deleteQuestion(id);
+
+    return NextResponse.json({ success: true, message: 'Question deleted successfully' });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
