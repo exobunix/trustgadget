@@ -37,7 +37,7 @@ export function Footer() {
       {/* Upper Trust Strip */}
       <div className="border-b border-slate-200 dark:border-slate-900 bg-white/80 dark:bg-slate-900/40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="flex items-start gap-3.5">
               <div className="p-2.5 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 border border-cyan-200 dark:border-cyan-500/30 text-cyan-600 dark:text-cyan-400 shrink-0">
                 <Zap className="w-5 h-5" />
@@ -55,16 +55,6 @@ export function Footer() {
               <div>
                 <h4 className="text-slate-900 dark:text-white font-semibold text-sm">Free Doorstep Pickup</h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Zero pickup charges across 19,000+ Indian pincodes.</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3.5">
-              <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-500/30 text-purple-600 dark:text-purple-400 shrink-0">
-                <Lock className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-slate-900 dark:text-white font-semibold text-sm">DoD Data Sanitization</h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">100% certified data wipe to keep your privacy inviolable.</p>
               </div>
             </div>
 

@@ -56,7 +56,7 @@ export default function HowItWorksPage() {
           {
             step: '04',
             title: 'Free Doorstep Verification & Instant Payment',
-            desc: 'Our certified logistics executive visits your home at your scheduled date and time slot. They perform a 5-minute diagnostic verification, guide you through a DoD certified data wipe, and transfer payment to your UPI / Bank before leaving.',
+            desc: 'Our certified logistics executive visits your home at your scheduled date and time slot. They perform a 5-minute diagnostic verification, guide you through a complete device reset, and transfer payment to your UPI / Bank before leaving.',
             icon: Truck,
             badge: 'STEP 4',
           },

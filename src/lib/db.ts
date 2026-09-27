@@ -479,6 +479,13 @@ function initTables(database: Database.Database) {
     // Ignore error if tables not yet populated
   }
 
+  // Purge DoD sanitization FAQ if present
+  try {
+    database.prepare(`
+      DELETE FROM faqs WHERE id = 'faq_4' OR question LIKE '%personal data stored%' OR answer LIKE '%DoD%'
+    `).run();
+  } catch (e) {}
+
   // Check if categories already seeded
   const countRow = database.prepare('SELECT COUNT(*) as count FROM categories').get() as { count: number };
   if (countRow.count === 0) {
@@ -976,6 +983,39 @@ export const dbHelpers = {
     return db.prepare('SELECT * FROM orders WHERE orderNumber = ?').get(orderNumber);
   },
   createOrder: (orderData: any) => {
+    // Validate or link userId safely to eliminate FOREIGN KEY constraint failed
+    let validUserId: string | null = null;
+    if (orderData.userId) {
+      try {
+        const u = db.prepare('SELECT id FROM users WHERE id = ?').get(orderData.userId);
+        if (u) {
+          validUserId = orderData.userId;
+        }
+      } catch (e) {}
+    }
+
+    if (!validUserId && orderData.customerPhone) {
+      const cleanPhone = orderData.customerPhone.replace(/[^0-9]/g, '');
+      if (cleanPhone) {
+        try {
+          const uByPhone = db.prepare('SELECT id FROM users WHERE phone = ?').get(cleanPhone) as any;
+          if (uByPhone) {
+            validUserId = uByPhone.id;
+          } else {
+            const newUserId = orderData.userId || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+            const userEmail = orderData.customerEmail || `${cleanPhone}@trustmygadget.user`;
+            db.prepare(`
+              INSERT INTO users (id, name, email, phone, role, isBlocked)
+              VALUES (?, ?, ?, ?, 'CUSTOMER', 0)
+            `).run(newUserId, orderData.customerName, userEmail, cleanPhone);
+            validUserId = newUserId;
+          }
+        } catch (e) {
+          validUserId = null;
+        }
+      }
+    }
+
     const stmt = db.prepare(`
       INSERT INTO orders (
         id, orderNumber, userId, customerName, customerPhone, customerEmail,
@@ -1000,7 +1040,7 @@ export const dbHelpers = {
     stmt.run({
       id: orderData.id,
       orderNumber: orderData.orderNumber,
-      userId: orderData.userId || null,
+      userId: validUserId,
       customerName: orderData.customerName,
       customerPhone: orderData.customerPhone,
       customerEmail: orderData.customerEmail || '',

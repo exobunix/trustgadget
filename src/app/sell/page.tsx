@@ -348,10 +348,10 @@ function SellPageContent() {
   return (
     <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8 font-sans">
       {/* Seller Safety & Phone Data Clean Note (Item 5) */}
-      <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-3 shadow-sm">
-        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+      <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-500/40 text-amber-950 dark:text-amber-200 text-xs flex items-start gap-3 shadow-sm">
+        <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
         <div className="leading-relaxed">
-          <strong className="text-amber-300 font-bold block mb-0.5">Important Safety Note for Phone Sellers:</strong>
+          <strong className="text-amber-900 dark:text-amber-300 font-bold block mb-0.5">Important Safety Note for Phone Sellers:</strong>
           Trust Gadget kindly requests you to clean your phone data (sign out of Google/Apple iCloud accounts and perform a factory reset) before handing over the phone to our collection executive for your personal safety, security, and privacy concern.
         </div>
       </div>

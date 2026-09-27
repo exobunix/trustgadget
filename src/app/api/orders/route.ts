@@ -108,10 +108,41 @@ export async function POST(request: NextRequest) {
     const orderNumber = `TMG-${randomDigits}`;
     const id = `ord_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
+    // Ensure user exists in users table to prevent any foreign key failures
+    let validUserId: string | null = null;
+    if (userId) {
+      try {
+        const u = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+        if (u) validUserId = userId;
+      } catch (e) {}
+    }
+
+    if (!validUserId && customerPhone) {
+      const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
+      if (cleanPhone) {
+        try {
+          const uByPhone = db.prepare('SELECT id FROM users WHERE phone = ?').get(cleanPhone) as any;
+          if (uByPhone) {
+            validUserId = uByPhone.id;
+          } else {
+            const newUserId = userId || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+            const userEmail = customerEmail || `${cleanPhone}@trustmygadget.user`;
+            db.prepare(`
+              INSERT INTO users (id, name, email, phone, role, isBlocked)
+              VALUES (?, ?, ?, ?, 'CUSTOMER', 0)
+            `).run(newUserId, customerName, userEmail, cleanPhone);
+            validUserId = newUserId;
+          }
+        } catch (e) {
+          validUserId = null;
+        }
+      }
+    }
+
     const orderData = {
       id,
       orderNumber,
-      userId: userId || null,
+      userId: validUserId,
       customerName,
       customerPhone,
       customerEmail: customerEmail || `${customerPhone.replace(/[^0-9]/g, '')}@trustmygadget.user`,

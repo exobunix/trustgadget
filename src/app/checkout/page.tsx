@@ -751,10 +751,10 @@ export default function CheckoutPage() {
               </div>
 
               {/* Phone Selling Data Cleaning Advisory (Item 5) */}
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-3">
-                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-500/40 text-amber-950 dark:text-amber-200 text-xs flex items-start gap-3 shadow-sm">
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                 <div className="leading-relaxed">
-                  <strong className="text-amber-300 font-semibold block mb-0.5">Important Safety & Privacy Advisory:</strong>
+                  <strong className="text-amber-900 dark:text-amber-300 font-semibold block mb-0.5">Important Safety & Privacy Advisory:</strong>
                   Trust Gadget kindly requests you to back up and clean all your phone data, remove Google/Apple iCloud accounts, and perform a factory reset before handing over the phone to our collection executive for your safety, security, and privacy concern.
                 </div>
               </div>
@@ -855,10 +855,6 @@ export default function CheckoutPage() {
             </div>
             <div className="flex justify-between text-slate-400">
               <span>Doorstep Pickup Fee</span>
-              <span className="text-emerald-400 font-bold">FREE (₹0)</span>
-            </div>
-            <div className="flex justify-between text-slate-400">
-              <span>DoD Data Erasure</span>
               <span className="text-emerald-400 font-bold">FREE (₹0)</span>
             </div>
             <div className="pt-3 border-t border-slate-800 flex justify-between items-center text-sm font-bold text-white">

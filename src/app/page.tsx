@@ -567,10 +567,6 @@ export default function HomePage() {
               </li>
               <li className="flex items-start gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                <span><strong>Certified DoD Data Sanitization:</strong> We secure-wipe your phone/laptop in front of you.</span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <span><strong>Instant UPI / Bank IMPS:</strong> Full money credited directly before handing over gadget.</span>
               </li>
             </ul>

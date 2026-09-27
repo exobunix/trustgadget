@@ -14615,14 +14615,6 @@ export const SEED_FAQS = [
     isFeatured: true,
   },
   {
-    id: 'faq_4',
-    category: 'Data Security',
-    question: 'What happens to my personal data stored on the old phone or laptop?',
-    answer: 'Your privacy is our top priority. Our verification specialist guides you through a factory reset and performs Department of Defense (DoD) compliant data sanitization before packaging, ensuring zero recovery of personal photos, chats, or passwords.',
-    displayOrder: 4,
-    isFeatured: true,
-  },
-  {
     id: 'faq_5',
     category: 'Device Condition',
     question: 'Do you buy cracked or damaged smartphones and dead laptops?',
@@ -14669,7 +14661,7 @@ export const SEED_BLOGS = [
 
 - **Step 1: Complete Cloud Backup**: Sync your documents, browser bookmarks, and developer keys to OneDrive, Google Drive, or iCloud.
 - **Step 2: Sign Out of OEM Licenses**: Deactivate Adobe Creative Cloud, Microsoft Office 365, and OEM device manager tools.
-- **Step 3: Cryptographic SSD Wipe**: Quick formats do not erase NAND flash blocks. Perform a BitLocker reset or DoD 5220.22-M multi-pass erase.
+- **Step 3: Cryptographic SSD Wipe**: Quick formats do not erase NAND flash blocks. Perform a BitLocker reset or cryptographic SSD secure erase.
 - **Step 4: Pack the High-Wattage OEM Adapter**: Laptop resale values drop significantly if the original charger is missing because genuine 65W–240W gallium nitride bricks cost up to ₹4,000.`,
     coverImage: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80',
     author: 'Vikram Mehta (Hardware Specialist)',

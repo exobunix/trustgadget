@@ -44,12 +44,6 @@ export default function WhyUsPage() {
             color: 'text-emerald-400',
           },
           {
-            title: 'Certified DoD Data Wipe',
-            desc: 'We sanitize SSDs, eMMCs, and flash chips to Department of Defense DoD 5220.22-M standards in front of your eyes.',
-            icon: Lock,
-            color: 'text-purple-400',
-          },
-          {
             title: 'Instant Cashless Payment',
             desc: 'Payment hit directly via UPI (Google Pay, PhonePe) or IMPS bank transfer before the agent leaves your premises.',
             icon: Zap,
@@ -112,12 +106,6 @@ export default function WhyUsPage() {
                 <td className="py-3.5 px-4 text-emerald-400 font-semibold flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> 100% Free Doorstep</td>
                 <td className="py-3.5 px-4 text-rose-400 flex items-center gap-1.5"><XCircle className="w-4 h-4" /> Must Travel</td>
                 <td className="py-3.5 px-4 text-amber-400 flex items-center gap-1.5"><XCircle className="w-4 h-4" /> Stranger Home Visits</td>
-              </tr>
-              <tr>
-                <td className="py-3.5 px-4 font-medium text-white">Data Security</td>
-                <td className="py-3.5 px-4 text-emerald-400 font-semibold flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> DoD Certified Erase</td>
-                <td className="py-3.5 px-4 text-rose-400 flex items-center gap-1.5"><XCircle className="w-4 h-4" /> Basic Factory Reset</td>
-                <td className="py-3.5 px-4 text-rose-400 flex items-center gap-1.5"><XCircle className="w-4 h-4" /> High Data Leak Risk</td>
               </tr>
               <tr>
                 <td className="py-3.5 px-4 font-medium text-white">Payout Speed</td>

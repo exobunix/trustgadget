@@ -22,7 +22,7 @@ export default function FAQsPage() {
     loadFaqs();
   }, []);
 
-  const categories = ['All', 'Valuation', 'Pickup & Payment', 'Data Security', 'Device Condition', 'General'];
+  const categories = ['All', 'Valuation', 'Pickup & Payment', 'Device Condition', 'General'];
 
   const filteredFaqs = faqs.filter((f) => {
     const matchCat = selectedCategory === 'All' || f.category.toLowerCase().includes(selectedCategory.toLowerCase());
@@ -42,7 +42,7 @@ export default function FAQsPage() {
           Frequently Asked Questions
         </h1>
         <p className="text-sm text-slate-600 dark:text-slate-300 mt-3 font-medium">
-          Everything you need to know about valuations, free doorstep pickup, certified data wiping, and instant payments.
+          Everything you need to know about valuations, free doorstep pickup, device inspection, and instant payments.
         </p>
 
         {/* Search */}

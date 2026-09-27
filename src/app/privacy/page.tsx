@@ -28,7 +28,7 @@ export default function PrivacyPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold w-fit">
-            <ShieldCheck className="w-4 h-4" /> ISO & DoD Sanitization Compliant
+            <ShieldCheck className="w-4 h-4" /> 100% Data Privacy Guaranteed
           </div>
         </div>
       </div>
