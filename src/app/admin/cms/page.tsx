@@ -31,10 +31,10 @@ export default function AdminCMSPage() {
   const [blogs, setBlogs] = useState<any[]>([]);
   const [testimonials, setTestimonials] = useState<any[]>([]);
   const [settings, setSettings] = useState<Record<string, string>>({
-    company_name: 'TrustMyGadget Technologies India Pvt Ltd',
-    support_phone: '1800 209 8899',
+    company_name: 'Trust Gadget',
+    support_phone: '+91 91139 90217',
     support_hours: 'Mon-Sun 9AM-8PM',
-    support_email: 'help@trustmygadget.com',
+    support_email: 'trustgadgetmart@gmail.com',
     office_address: 'Cyber City, Phase II, Gurugram, NCR, India',
     pickup_pincodes_count: '19450',
     min_order_value: '1500',
@@ -598,7 +598,7 @@ export default function AdminCMSPage() {
                   value={settings.support_phone || ''}
                   onChange={(e) => setSettings({ ...settings, support_phone: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-cyan-400"
-                  placeholder="e.g. 1800 209 8899"
+                  placeholder="e.g. +91 91139 90217"
                 />
               </div>
 
@@ -620,7 +620,7 @@ export default function AdminCMSPage() {
                   value={settings.support_email || ''}
                   onChange={(e) => setSettings({ ...settings, support_email: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-cyan-400"
-                  placeholder="e.g. help@trustmygadget.com"
+                  placeholder="e.g. trustgadgetmart@gmail.com"
                 />
               </div>
 
@@ -631,7 +631,7 @@ export default function AdminCMSPage() {
                   value={settings.company_name || ''}
                   onChange={(e) => setSettings({ ...settings, company_name: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-cyan-400"
-                  placeholder="e.g. TrustMyGadget Technologies India Pvt Ltd"
+                  placeholder="e.g. Trust Gadget"
                 />
               </div>
 

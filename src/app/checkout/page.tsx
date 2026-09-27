@@ -63,7 +63,8 @@ export default function CheckoutPage() {
   const [payoutBankIfsc, setPayoutBankIfsc] = useState('');
   const [payoutBankName, setPayoutBankName] = useState('');
 
-  const [agreedToTerms, setAgreedToTerms] = useState(true);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [agreedToPartnerConsent, setAgreedToPartnerConsent] = useState(false);
 
   // Load user and trade-in device summary
   useEffect(() => {
@@ -207,8 +208,13 @@ export default function CheckoutPage() {
       return;
     }
 
+    if (!agreedToPartnerConsent) {
+      setErrorMsg('Please agree that your details will be shared with our partner representative to proceed.');
+      return;
+    }
+
     if (!agreedToTerms) {
-      setErrorMsg('Please accept the terms and conditions.');
+      setErrorMsg('Please accept the device ownership and terms of sale.');
       return;
     }
     setSubmitting(true);
@@ -241,6 +247,10 @@ export default function CheckoutPage() {
         pickupLandmark,
         pickupNotes,
         conditionSummary: orderSummary?.conditionSummary || {},
+        agreedToPartnerConsent: true,
+        consentGiven: true,
+        consentText: 'I agree that my details (name, phone, email, address) will be shared with our partner representative who will contact/visit me on behalf of Trust Gadget.',
+        consentTimestamp: new Date().toISOString(),
       };
 
       const res = await fetch('/api/orders', {
@@ -740,16 +750,46 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              {/* Phone Selling Data Cleaning Advisory (Item 5) */}
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-3">
+                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">
+                  <strong className="text-amber-300 font-semibold block mb-0.5">Important Safety & Privacy Advisory:</strong>
+                  Trust Gadget kindly requests you to back up and clean all your phone data, remove Google/Apple iCloud accounts, and perform a factory reset before handing over the phone to our collection executive for your safety, security, and privacy concern.
+                </div>
+              </div>
+
+              {/* Consent Checkbox (Item 1 & 2: Unchecked by default) */}
+              <label className="flex items-start gap-3 p-3.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-cyan-500/40 transition-colors cursor-pointer">
+                <input
+                  type="checkbox"
+                  required
+                  checked={agreedToPartnerConsent}
+                  onChange={(e) => setAgreedToPartnerConsent(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-400 focus:ring-offset-slate-950 cursor-pointer"
+                />
+                <span className="text-xs text-slate-300 leading-relaxed">
+                  I agree that my details (name, phone, email, address) will be shared with our partner representative who will contact/visit me on behalf of <strong className="text-white">Trust Gadget</strong>. Read our{' '}
+                  <Link href="/privacy" target="_blank" className="text-cyan-400 font-medium underline hover:text-cyan-300">
+                    Privacy Policy
+                  </Link>{' '}
+                  and{' '}
+                  <Link href="/terms" target="_blank" className="text-cyan-400 font-medium underline hover:text-cyan-300">
+                    Terms of Service
+                  </Link>.
+                </span>
+              </label>
+
               {/* Terms Checkbox */}
               <label className="flex items-start gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={agreedToTerms}
                   onChange={(e) => setAgreedToTerms(e.target.checked)}
-                  className="mt-0.5 rounded border-slate-700 text-cyan-500 focus:ring-cyan-400"
+                  className="mt-0.5 h-4 w-4 rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-400 cursor-pointer"
                 />
                 <span className="text-xs text-slate-300 leading-relaxed">
-                  I certify that I am the legal owner of this device, device is free from financial lien/locks, and I agree to TrustMyGadget’s <Link href="/terms" className="text-cyan-400 underline">Terms of Sale</Link>.
+                  I certify that I am the legal owner of this device, device is free from financial lien/locks, and I agree to Trust Gadget’s <Link href="/terms" target="_blank" className="text-cyan-400 underline">Terms of Sale</Link>.
                 </span>
               </label>
 

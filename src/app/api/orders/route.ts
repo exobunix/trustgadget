@@ -83,6 +83,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Missing required customer or pickup details' }, { status: 400 });
     }
 
+    // Client IP and User Agent extraction for audit/compliance
+    const forwardedFor = request.headers.get('x-forwarded-for');
+    const realIp = request.headers.get('x-real-ip');
+    const cfIp = request.headers.get('cf-connecting-ip');
+    const clientIp = (forwardedFor ? forwardedFor.split(',')[0].trim() : null) || realIp || cfIp || '127.0.0.1';
+    const userAgent = request.headers.get('user-agent') || 'Unknown';
+
+    // Verify Consent
+    const consentText = body.consentText || 'I agree that my details (name, phone, email, address) will be shared with our partner representative who will contact/visit me on behalf of Trust Gadget.';
+    const consentGiven = body.consentGiven === true || body.consentGiven === 1 || body.agreedToPartnerConsent === true;
+
+    if (!consentGiven) {
+      return NextResponse.json({
+        success: false,
+        error: 'Consent to share your details with our verified partner representative is required to schedule a pickup.',
+      }, { status: 400 });
+    }
+
+    const consentTimestamp = body.consentTimestamp || new Date().toISOString();
+
     // Generate unique Indian Order Number
     const randomDigits = Math.floor(100000 + Math.random() * 900000);
     const orderNumber = `TMG-${randomDigits}`;
@@ -119,6 +139,11 @@ export async function POST(request: NextRequest) {
       pickupLandmark: pickupLandmark || null,
       pickupNotes: pickupNotes || null,
       conditionSummary: typeof conditionSummary === 'object' ? JSON.stringify(conditionSummary) : conditionSummary || null,
+      consentGiven: 1,
+      consentText,
+      consentTimestamp,
+      consentIp: clientIp,
+      userAgent,
     };
 
     dbHelpers.createOrder(orderData);

@@ -14,6 +14,7 @@ import {
   Search,
   ChevronRight,
   ArrowLeft,
+  AlertCircle,
 } from 'lucide-react';
 import { triggerWebNotification } from '@/lib/notifications';
 
@@ -152,11 +153,20 @@ export default function CustomerSupportPage() {
           Help & Customer Care
         </span>
         <h1 className="text-3xl sm:text-4xl font-extrabold text-white">
-          TrustMyGadget Support Center
+          Trust Gadget Support Center
         </h1>
         <p className="text-xs sm:text-sm text-slate-300">
           Chat with our trade-in specialists, track your support tickets, or resolve pickup and payment inquiries.
         </p>
+      </div>
+
+      {/* Safety Advisory Banner for Phone Sellers (Item 5) */}
+      <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-3">
+        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+        <div className="leading-relaxed">
+          <strong className="text-amber-300 font-semibold block mb-0.5">Note for Phone Selling:</strong>
+          Trust Gadget kindly requests you to clean and factory reset your phone data before handing over the phone to our collection executive for your safety and concern.
+        </div>
       </div>
 
       {/* 3 Action Help Tiles */}
@@ -184,14 +194,17 @@ export default function CustomerSupportPage() {
             <div className="w-10 h-10 rounded-xl bg-emerald-950 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
               <Phone className="w-5 h-5" />
             </div>
-            <h3 className="font-bold text-white text-sm">Toll-Free Helpline</h3>
+            <h3 className="font-bold text-white text-sm">Direct Customer Helpline</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
               Available 7 Days a week (9:00 AM – 8:00 PM IST) across 19,000+ Indian pincodes.
             </p>
           </div>
-          <div className="mt-4 font-mono font-bold text-sm text-emerald-400">
-            1800 209 8899
-          </div>
+          <a
+            href="tel:+919113990217"
+            className="mt-4 font-mono font-bold text-sm text-emerald-400 hover:underline flex items-center gap-1.5"
+          >
+            <span>+91 91139 90217</span>
+          </a>
         </div>
 
         <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 glass-panel flex flex-col justify-between">

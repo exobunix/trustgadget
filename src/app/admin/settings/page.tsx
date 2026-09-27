@@ -83,17 +83,17 @@ export default function AdminSettingsPage() {
               <label className="block text-slate-300 font-semibold mb-1">Company Registered Name</label>
               <input
                 type="text"
-                value={settings.company_name || 'TrustMyGadget Technologies India Pvt Ltd'}
+                value={settings.company_name || 'Trust Gadget'}
                 onChange={(e) => updateKey('company_name', e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white"
               />
             </div>
 
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Toll-Free Customer Support</label>
+              <label className="block text-slate-300 font-semibold mb-1">Customer Support Phone</label>
               <input
                 type="text"
-                value={settings.support_phone || '1800 209 8899'}
+                value={settings.support_phone || '+91 91139 90217'}
                 onChange={(e) => updateKey('support_phone', e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white"
               />
@@ -103,7 +103,7 @@ export default function AdminSettingsPage() {
               <label className="block text-slate-300 font-semibold mb-1">Support Email</label>
               <input
                 type="email"
-                value={settings.support_email || 'help@trustmygadget.com'}
+                value={settings.support_email || 'trustgadgetmart@gmail.com'}
                 onChange={(e) => updateKey('support_email', e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white"
               />

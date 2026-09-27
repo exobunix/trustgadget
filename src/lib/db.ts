@@ -428,6 +428,21 @@ function initTables(database: Database.Database) {
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (ticketId) REFERENCES support_tickets (id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS consent_logs (
+      id TEXT PRIMARY KEY,
+      submissionType TEXT NOT NULL,
+      referenceId TEXT,
+      customerName TEXT NOT NULL,
+      customerPhone TEXT NOT NULL,
+      customerEmail TEXT,
+      pickupAddress TEXT,
+      consentText TEXT NOT NULL,
+      consentGiven INTEGER DEFAULT 1,
+      ipAddress TEXT,
+      userAgent TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   try {
@@ -435,6 +450,19 @@ function initTables(database: Database.Database) {
   } catch (e) {
     // Column already exists
   }
+
+  // Ensure consent columns exist on orders table
+  try { database.exec('ALTER TABLE orders ADD COLUMN consentGiven INTEGER DEFAULT 1'); } catch (e) {}
+  try { database.exec('ALTER TABLE orders ADD COLUMN consentText TEXT'); } catch (e) {}
+  try { database.exec('ALTER TABLE orders ADD COLUMN consentTimestamp DATETIME'); } catch (e) {}
+  try { database.exec('ALTER TABLE orders ADD COLUMN consentIp TEXT'); } catch (e) {}
+
+  // Synchronize company legal name and contact details across existing databases
+  try {
+    database.prepare("UPDATE settings SET value = 'Trust Gadget' WHERE key = 'company_name'").run();
+    database.prepare("UPDATE settings SET value = '+91 91139 90217' WHERE key = 'support_phone'").run();
+    database.prepare("UPDATE settings SET value = 'trustgadgetmart@gmail.com' WHERE key = 'support_email'").run();
+  } catch (e) {}
 
   // Purge any dummy seed orders from the system
   try {
@@ -738,9 +766,9 @@ function seedDatabase(database: Database.Database) {
 
     // Settings
     const defaultSettings = [
-      { key: 'company_name', value: 'TrustMyGadget Technologies India Pvt Ltd', groupName: 'general', description: 'Registered legal company name' },
-      { key: 'support_phone', value: '+91 1800 209 8899', groupName: 'general', description: 'Toll-free customer support helpline' },
-      { key: 'support_email', value: 'help@trustmygadget.com', groupName: 'general', description: 'Customer support email address' },
+      { key: 'company_name', value: 'Trust Gadget', groupName: 'general', description: 'Registered legal company name' },
+      { key: 'support_phone', value: '+91 91139 90217', groupName: 'general', description: 'Toll-free customer support helpline' },
+      { key: 'support_email', value: 'trustgadgetmart@gmail.com', groupName: 'general', description: 'Customer support email address' },
       { key: 'pickup_pincodes_count', value: '19450', groupName: 'business', description: 'Serviceable pincodes in India' },
       { key: 'min_order_value', value: '1500', groupName: 'valuation', description: 'Minimum resale device purchase threshold in INR' },
       { key: 'instant_upi_enabled', value: 'true', groupName: 'payment', description: 'Enable instant IMPS / UPI doorstep payout' },
@@ -894,6 +922,49 @@ export const dbHelpers = {
     return db.prepare('DELETE FROM questions WHERE id = ?').run(questionId);
   },
 
+  // Consent Logging
+  logConsent: (consentData: {
+    id?: string;
+    submissionType: string;
+    referenceId?: string | null;
+    customerName: string;
+    customerPhone: string;
+    customerEmail?: string | null;
+    pickupAddress?: string | null;
+    consentText: string;
+    consentGiven?: number;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+  }) => {
+    try {
+      const id = consentData.id || `cns_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      db.prepare(`
+        INSERT INTO consent_logs (
+          id, submissionType, referenceId, customerName, customerPhone,
+          customerEmail, pickupAddress, consentText, consentGiven, ipAddress, userAgent, createdAt
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
+        )
+      `).run(
+        id,
+        consentData.submissionType,
+        consentData.referenceId || null,
+        consentData.customerName,
+        consentData.customerPhone,
+        consentData.customerEmail || null,
+        consentData.pickupAddress || null,
+        consentData.consentText,
+        consentData.consentGiven ?? 1,
+        consentData.ipAddress || null,
+        consentData.userAgent || null
+      );
+      return id;
+    } catch (e) {
+      console.error('Consent logging error:', e);
+      return null;
+    }
+  },
+
   // Orders
   getOrders: (limit = 100) => {
     return db.prepare('SELECT * FROM orders ORDER BY createdAt DESC LIMIT ?').all(limit);
@@ -912,14 +983,18 @@ export const dbHelpers = {
         basePrice, estimatedPrice, finalVerifiedPrice, status, paymentStatus,
         payoutMethod, payoutUpiId, payoutBankAccount, payoutBankIfsc, payoutBankName,
         pickupDate, pickupTimeSlot, pickupAddress, pickupCity, pickupState,
-        pickupPincode, pickupLandmark, pickupNotes, conditionSummary, createdAt, updatedAt
+        pickupPincode, pickupLandmark, pickupNotes, conditionSummary,
+        consentGiven, consentText, consentTimestamp, consentIp,
+        createdAt, updatedAt
       ) VALUES (
         @id, @orderNumber, @userId, @customerName, @customerPhone, @customerEmail,
         @categoryName, @brandName, @modelName, @variantName, @deviceImageUrl,
         @basePrice, @estimatedPrice, @finalVerifiedPrice, @status, @paymentStatus,
         @payoutMethod, @payoutUpiId, @payoutBankAccount, @payoutBankIfsc, @payoutBankName,
         @pickupDate, @pickupTimeSlot, @pickupAddress, @pickupCity, @pickupState,
-        @pickupPincode, @pickupLandmark, @pickupNotes, @conditionSummary, datetime('now'), datetime('now')
+        @pickupPincode, @pickupLandmark, @pickupNotes, @conditionSummary,
+        @consentGiven, @consentText, @consentTimestamp, @consentIp,
+        datetime('now'), datetime('now')
       )
     `);
     stmt.run({
@@ -953,7 +1028,27 @@ export const dbHelpers = {
       pickupLandmark: orderData.pickupLandmark || null,
       pickupNotes: orderData.pickupNotes || null,
       conditionSummary: typeof orderData.conditionSummary === 'object' ? JSON.stringify(orderData.conditionSummary) : (orderData.conditionSummary || null),
+      consentGiven: orderData.consentGiven !== undefined ? (orderData.consentGiven ? 1 : 0) : 1,
+      consentText: orderData.consentText || 'I agree that my details (name, phone, email, address) will be shared with our partner representative who will contact/visit me on behalf of Trust Gadget.',
+      consentTimestamp: orderData.consentTimestamp || new Date().toISOString(),
+      consentIp: orderData.consentIp || null,
     });
+
+    try {
+      dbHelpers.logConsent({
+        submissionType: 'SELL_ORDER',
+        referenceId: orderData.id,
+        customerName: orderData.customerName,
+        customerPhone: orderData.customerPhone,
+        customerEmail: orderData.customerEmail,
+        pickupAddress: `${orderData.pickupAddress}, ${orderData.pickupCity} - ${orderData.pickupPincode}`,
+        consentText: orderData.consentText || 'I agree that my details (name, phone, email, address) will be shared with our partner representative who will contact/visit me on behalf of Trust Gadget.',
+        consentGiven: orderData.consentGiven !== undefined ? (orderData.consentGiven ? 1 : 0) : 1,
+        ipAddress: orderData.consentIp || null,
+        userAgent: orderData.userAgent || null,
+      });
+    } catch (e) {}
+
     return orderData;
   },
   updateOrderStatus: (orderId: string, status: string, note?: string, changedBy?: string) => {

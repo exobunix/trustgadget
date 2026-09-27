@@ -347,6 +347,15 @@ function SellPageContent() {
 
   return (
     <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8 font-sans">
+      {/* Seller Safety & Phone Data Clean Note (Item 5) */}
+      <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-3 shadow-sm">
+        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+        <div className="leading-relaxed">
+          <strong className="text-amber-300 font-bold block mb-0.5">Important Safety Note for Phone Sellers:</strong>
+          Trust Gadget kindly requests you to clean your phone data (sign out of Google/Apple iCloud accounts and perform a factory reset) before handing over the phone to our collection executive for your personal safety, security, and privacy concern.
+        </div>
+      </div>
+
       {/* Top 6-Step Tracker (Screenshots 4 & 5 Match) */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-4 sm:p-5 glass-panel">
         <div className="flex items-center justify-between overflow-x-auto gap-2">
@@ -933,10 +942,10 @@ function SellPageContent() {
                   <div className="text-[10px] text-slate-400">Our support team is here for you</div>
                 </div>
                 <a
-                  href="tel:18002098899"
+                  href="tel:+919113990217"
                   className="text-emerald-400 font-mono font-bold text-xs flex items-center gap-1 hover:underline"
                 >
-                  <Phone className="w-3.5 h-3.5" /> 1800 209 8899
+                  <Phone className="w-3.5 h-3.5" /> +91 91139 90217
                 </a>
               </div>
             </div>

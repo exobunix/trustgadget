@@ -14,11 +14,11 @@ import {
 
 export function Footer() {
   const [settings, setSettings] = useState<Record<string, string>>({
-    support_phone: '1800 209 8899',
+    support_phone: '+91 91139 90217',
     support_hours: 'Mon-Sun 9AM-8PM',
-    support_email: 'help@trustmygadget.com',
+    support_email: 'trustgadgetmart@gmail.com',
     office_address: 'Cyber City, Phase II, Gurugram, NCR, India',
-    company_name: 'TrustMyGadget Technologies India Pvt Ltd',
+    company_name: 'Trust Gadget',
   });
 
   useEffect(() => {
@@ -155,7 +155,7 @@ export function Footer() {
 
         {/* Bottom Bar */}
         <div className="mt-12 pt-6 border-t border-slate-200 dark:border-slate-900 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
-          <p>© {new Date().getFullYear()} TrustMyGadget Technologies India Pvt Ltd. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Trust Gadget. All rights reserved.</p>
           <div className="flex items-center gap-4">
             <Link href="/privacy" className="hover:text-slate-700 dark:hover:text-slate-400">Privacy</Link>
             <span>•</span>
