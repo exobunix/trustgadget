@@ -8,8 +8,8 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen py-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto space-y-16">
       <div className="text-center max-w-2xl mx-auto">
-        <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">
-          About TrustMyGadget
+        <span className="text-xs font-bold text-orange-400 uppercase tracking-widest">
+          About TrustGadgetMart
         </span>
         <h1 className="text-3xl sm:text-5xl font-extrabold text-white mt-2">
           Pioneering India’s Tech Trade-in Revolution
@@ -26,7 +26,7 @@ export default function AboutPage() {
           India is the second largest smartphone market in the world, with over 150 million devices upgraded every year. Yet, until recently, selling a used gadget meant travelling to congested grey markets, facing stressful haggling, and risking private data leaks from uncertified resets.
         </p>
         <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-          TrustMyGadget was established to build an algorithmic, transparent bridge between device owners and the secondary tech ecosystem. By fusing proprietary pricing models with verified doorstep logistics and instant UPI payments, we empower every consumer to unlock true cash value from their gadgets in minutes.
+          TrustGadgetMart was established to build an algorithmic, transparent bridge between device owners and the secondary tech ecosystem. By fusing proprietary pricing models with verified doorstep logistics and instant UPI payments, we empower every consumer to unlock true cash value from their gadgets in minutes.
         </p>
       </div>
 

@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Trust Gadget | Sell Your Old Phone & Laptop for Instant Cash',
-  description: 'Turn your old smartphone or laptop into instant cash with Trust Gadget. Get transparent algorithmic quotes, free doorstep pickup, and instant UPI payout across 19,000+ Indian pincodes.',
-  keywords: 'sell old phone, sell laptop, cash for phones, device resale india, used iphone price, sell macbook, sell used mobile, trust gadget',
+  title: 'TrustGadgetMart | Your Tech Destination - Instant Device Resale',
+  description: 'Turn your old smartphone or laptop into instant cash with TrustGadgetMart. Get transparent algorithmic quotes, free doorstep pickup, and instant UPI payout across 19,000+ Indian pincodes.',
+  keywords: 'trustgadgetmart, trust gadget mart, sell old phone, sell laptop, cash for phones, device resale india, used iphone price, sell macbook, sell used mobile',
 };
 
 export default function RootLayout({

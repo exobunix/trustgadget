@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   Smartphone,
   Laptop,
@@ -145,7 +146,7 @@ export default function HomePage() {
 
               {/* Subtitle */}
               <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                Turn your old smartphone or laptop into instant cash with TrustMyGadget. Get a transparent quote in 60 seconds, schedule a doorstep pickup, and get paid instantly to your UPI or Bank.
+                Turn your old smartphone or laptop into instant cash with TrustGadgetMart. Get a transparent quote in 60 seconds, schedule a doorstep pickup, and get paid instantly to your UPI or Bank.
               </p>
 
               {/* Quick Category Action Cards */}
@@ -455,7 +456,7 @@ export default function HomePage() {
               Simple & Fast Process
             </span>
             <h2 className="text-3xl font-extrabold text-white mt-1">
-              How TrustMyGadget Works
+              How TrustGadgetMart Works
             </h2>
             <p className="text-sm text-slate-400 mt-2">
               From instant valuation to cash in your bank account in 4 frictionless steps.
@@ -527,7 +528,7 @@ export default function HomePage() {
             The Trust Advantage
           </span>
           <h2 className="text-3xl font-extrabold text-white mt-1">
-            Why Choose TrustMyGadget vs Offline Tech Markets?
+            Why Choose TrustGadgetMart vs Offline Tech Markets?
           </h2>
           <p className="text-sm text-slate-400 mt-2">
             Experience the difference of an algorithm-powered technology resale platform.
@@ -535,15 +536,23 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* TrustMyGadget Box */}
-          <div className="p-8 rounded-3xl bg-slate-900/90 border border-cyan-500/40 shadow-xl shadow-cyan-500/10 space-y-4">
+          {/* TrustGadgetMart Box */}
+          <div className="p-8 rounded-3xl bg-slate-900/90 border border-orange-500/30 shadow-xl shadow-orange-500/5 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-cyan-950 border border-cyan-500/30 text-cyan-400">
-                <ShieldCheck className="w-6 h-6" />
+              <div className="w-12 h-12 rounded-2xl bg-white p-1.5 shadow-lg border border-slate-700 flex items-center justify-center shrink-0">
+                <Image
+                  src="/logo-icon.png"
+                  alt="TrustGadgetMart"
+                  width={36}
+                  height={36}
+                  className="w-full h-full object-contain"
+                />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white">TrustMyGadget</h3>
-                <span className="text-xs text-cyan-400 font-semibold">Next-Gen Digital Resale</span>
+                <h3 className="text-xl font-bold text-white flex items-center gap-1">
+                  <span>Trust</span><span className="text-orange-500">GadgetMart</span>
+                </h3>
+                <span className="text-xs text-orange-400 font-semibold">Your Tech Destination • Fast Resale</span>
               </div>
             </div>
 

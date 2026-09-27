@@ -18,10 +18,10 @@ export default function WhyUsPage() {
     <div className="min-h-screen py-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto space-y-16">
       <div className="text-center max-w-2xl mx-auto">
         <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">
-          The TrustMyGadget Edge
+          The TrustGadgetMart Edge
         </span>
         <h1 className="text-3xl sm:text-5xl font-extrabold text-white mt-2">
-          Why TrustMyGadget?
+          Why TrustGadgetMart?
         </h1>
         <p className="text-sm text-slate-300 mt-3 leading-relaxed">
           Designed from the ground up to eliminate unfair bargaining, risky data wipes, and tedious offline market negotiations.
@@ -95,7 +95,7 @@ export default function WhyUsPage() {
             <thead>
               <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider">
                 <th className="py-3 px-4 font-semibold">Features</th>
-                <th className="py-3 px-4 font-bold text-cyan-400">TrustMyGadget</th>
+                <th className="py-3 px-4 font-bold text-orange-400">TrustGadgetMart</th>
                 <th className="py-3 px-4 font-semibold text-slate-500">Offline Second-Hand Stores</th>
                 <th className="py-3 px-4 font-semibold text-slate-500">Peer-to-Peer Classifieds</th>
               </tr>

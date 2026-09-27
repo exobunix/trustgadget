@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Lock, Mail, ShieldCheck, ArrowRight, AlertCircle } from 'lucide-react';
 
 export default function AdminLoginPage() {
@@ -57,13 +58,18 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-8 glass-panel shadow-2xl relative z-10 space-y-6">
         {/* Logo & Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-purple-600 p-0.5 shadow-lg shadow-purple-500/25 mb-1">
-            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-              <ShieldCheck className="w-7 h-7 text-cyan-400" />
-            </div>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white p-2 shadow-xl shadow-orange-500/10 border border-slate-800 mb-1">
+            <Image
+              src="/logo-icon.png"
+              alt="TrustGadgetMart Logo"
+              width={56}
+              height={56}
+              className="w-full h-full object-contain"
+              priority
+            />
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">
-            Trust<span className="text-purple-400">My</span>Gadget
+          <h1 className="text-2xl font-black text-white tracking-tight flex items-center justify-center gap-1">
+            <span>Trust</span><span className="text-orange-500">GadgetMart</span>
           </h1>
           <p className="text-xs text-slate-400">
             Internal Operations & Governance Console

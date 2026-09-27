@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   ShieldCheck,
   Zap,
@@ -18,7 +19,7 @@ export function Footer() {
     support_hours: 'Mon-Sun 9AM-8PM',
     support_email: 'trustgadgetmart@gmail.com',
     office_address: 'Cyber City, Phase II, Gurugram, NCR, India',
-    company_name: 'Trust Gadget',
+    company_name: 'Trust Gadget Mart',
   });
 
   useEffect(() => {
@@ -85,15 +86,24 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
           {/* Brand Col */}
           <div className="lg:col-span-2 space-y-4">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 p-0.5 shadow-lg shadow-cyan-500/20">
-                <div className="w-full h-full bg-white dark:bg-slate-950 rounded-[10px] flex items-center justify-center">
-                  <ShieldCheck className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                </div>
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 p-1 shadow-md shadow-orange-500/10 border border-slate-200 dark:border-slate-800 flex items-center justify-center shrink-0 group-hover:border-orange-500/50 transition-all">
+                <Image
+                  src="/logo-icon.png"
+                  alt="TrustGadgetMart Logo"
+                  width={38}
+                  height={38}
+                  className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                />
               </div>
-              <span className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                Trust<span className="text-cyan-600 dark:text-cyan-400">My</span>Gadget
-              </span>
+              <div className="flex flex-col">
+                <span className="text-xl font-black text-slate-900 dark:text-white tracking-tight flex items-center leading-none">
+                  <span>Trust</span><span className="text-orange-500">GadgetMart</span>
+                </span>
+                <span className="text-[9px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-bold mt-1">
+                  Your Tech Destination
+                </span>
+              </div>
             </Link>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm">
               India’s next-generation technology trade-in and resale infrastructure. Sell old smartphones, MacBooks, and high-performance gaming laptops with instant valuation and certified doorstep payout.
@@ -134,7 +144,7 @@ export function Footer() {
             <ul className="space-y-2 text-xs">
               <li><Link href="/about" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">About Us</Link></li>
               <li><Link href="/how-it-works" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">How It Works</Link></li>
-              <li><Link href="/why-us" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Why TrustMyGadget</Link></li>
+              <li><Link href="/why-us" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Why TrustGadgetMart</Link></li>
               <li><Link href="/blog" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Resale Insights Blog</Link></li>
               <li><Link href="/contact" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Contact Support</Link></li>
               <li><Link href="/track-order" className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-emerald-600 dark:text-emerald-400 font-semibold">Track Your Order</Link></li>
@@ -155,7 +165,7 @@ export function Footer() {
 
         {/* Bottom Bar */}
         <div className="mt-12 pt-6 border-t border-slate-200 dark:border-slate-900 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
-          <p>© {new Date().getFullYear()} Trust Gadget. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} {settings.company_name || 'Trust Gadget Mart'}. All rights reserved.</p>
           <div className="flex items-center gap-4">
             <Link href="/privacy" className="hover:text-slate-700 dark:hover:text-slate-400">Privacy</Link>
             <span>•</span>

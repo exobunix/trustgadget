@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   Smartphone,
@@ -59,18 +60,23 @@ export function Header() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             {/* LEFT: Logo */}
-            <Link href="/" className="flex items-center gap-2 sm:gap-2.5 group shrink-0">
-              <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 p-0.5 shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-all shrink-0">
-                <div className="w-full h-full bg-white dark:bg-slate-950 rounded-[10px] flex items-center justify-center">
-                  <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
-                </div>
+            <Link href="/" className="flex items-center gap-2.5 sm:gap-3 group shrink-0">
+              <div className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white dark:bg-slate-900 p-1 shadow-md shadow-orange-500/10 border border-slate-200/80 dark:border-slate-800 flex items-center justify-center shrink-0 group-hover:border-orange-500/40 transition-all">
+                <Image
+                  src="/logo-icon.png"
+                  alt="TrustGadgetMart Logo"
+                  width={40}
+                  height={40}
+                  className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                  priority
+                />
               </div>
               <div className="flex flex-col">
-                <span className="text-lg sm:text-xl font-black tracking-tight text-slate-900 dark:text-white flex items-center">
-                  Trust<span className="text-cyan-600 dark:text-cyan-400">My</span>Gadget
+                <span className="text-lg sm:text-xl font-black tracking-tight text-slate-900 dark:text-white flex items-center leading-none">
+                  <span>Trust</span><span className="text-orange-500">GadgetMart</span>
                 </span>
-                <span className="text-[9px] sm:text-[10px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-semibold -mt-1">
-                  Instant Tech Resale
+                <span className="text-[8px] sm:text-[9px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-bold mt-1">
+                  Your Tech Destination
                 </span>
               </div>
             </Link>

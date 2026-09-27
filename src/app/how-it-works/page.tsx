@@ -22,7 +22,7 @@ export default function HowItWorksPage() {
           Seamless Trade-in Experience
         </span>
         <h1 className="text-3xl sm:text-5xl font-extrabold text-white mt-2">
-          How TrustMyGadget Works
+          How TrustGadgetMart Works
         </h1>
         <p className="text-sm text-slate-300 mt-3 leading-relaxed">
           We’ve re-engineered the old phone and laptop selling experience with algorithmic pricing, free doorstep pickup, and instant cashless payouts.

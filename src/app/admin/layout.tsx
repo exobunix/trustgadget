@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -144,17 +145,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {mobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          <Link href="/admin" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-purple-600 p-0.5 shadow-md shadow-purple-500/20">
-              <div className="w-full h-full bg-slate-950 rounded-[6px] flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-cyan-400" />
-              </div>
+          <Link href="/admin" className="flex items-center gap-2.5 group">
+            <div className="w-9 h-9 rounded-xl bg-white dark:bg-slate-900 p-1 shadow-md shadow-orange-500/10 border border-slate-700/80 flex items-center justify-center shrink-0 group-hover:border-orange-500/50 transition-all">
+              <Image
+                src="/logo-icon.png"
+                alt="TrustGadgetMart Admin"
+                width={32}
+                height={32}
+                className="w-full h-full object-contain"
+              />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-black text-white tracking-tight">
-                TrustMyGadget <span className="text-purple-400">ADMIN</span>
+              <span className="text-sm font-black text-white tracking-tight flex items-center gap-1.5 leading-none">
+                <span>Trust<span className="text-orange-500">GadgetMart</span></span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">ADMIN</span>
               </span>
-              <span className="text-[9px] tracking-widest text-slate-400 uppercase font-semibold">
+              <span className="text-[8.5px] tracking-widest text-slate-400 uppercase font-semibold mt-1">
                 Control Hub v3.0
               </span>
             </div>
