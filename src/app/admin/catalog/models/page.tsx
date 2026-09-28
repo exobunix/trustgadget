@@ -340,7 +340,7 @@ export default function AdminModelsPage() {
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-950/40 text-slate-400 uppercase tracking-wider">
                   <th className="py-3.5 px-4 font-semibold">Device Configuration</th>
-                  <th className="py-3.5 px-4 font-semibold">Brand & Series</th>
+                  <th className="py-3.5 px-4 font-semibold">Manufacturer Brand</th>
                   <th className="py-3.5 px-4 font-semibold">Storage / RAM</th>
                   <th className="py-3.5 px-4 font-semibold">Base Price</th>
                   <th className="py-3.5 px-4 font-semibold text-right">Actions</th>
@@ -374,7 +374,7 @@ export default function AdminModelsPage() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="font-semibold text-white">{v.brandName}</div>
-                        <div className="text-slate-500 text-[10px]">{v.series || v.categoryName}</div>
+                        <div className="text-slate-500 text-[10px]">{v.categoryName}</div>
                       </td>
                       <td className="py-3 px-4">
                         <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-[11px] font-mono text-slate-300">
@@ -386,13 +386,22 @@ export default function AdminModelsPage() {
                           ₹{Number(v.basePrice).toLocaleString('en-IN')}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right space-x-1.5">
+                      <td className="py-3 px-4 text-right space-x-2">
                         <button
                           onClick={() => openEditModal(v.parentModel)}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-400 transition-colors text-[11px] font-medium"
+                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-400 transition-colors text-[11px] font-medium inline-flex items-center gap-1"
                           title="Edit Model & Variants"
                         >
-                          Edit
+                          <Edit className="w-3 h-3" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDelete(v.modelId || v.parentModel?.id)}
+                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 transition-colors text-[11px] font-medium inline-flex items-center gap-1"
+                          title="Delete Device Model"
+                        >
+                          <Trash2 className="w-3 h-3 text-rose-400" />
+                          <span>Delete</span>
                         </button>
                       </td>
                     </tr>
@@ -406,7 +415,7 @@ export default function AdminModelsPage() {
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-950/40 text-slate-400 uppercase tracking-wider">
                   <th className="py-3.5 px-4 font-semibold">Device Family</th>
-                  <th className="py-3.5 px-4 font-semibold">Brand & Series</th>
+                  <th className="py-3.5 px-4 font-semibold">Manufacturer Brand</th>
                   <th className="py-3.5 px-4 font-semibold">Base Buyback Price</th>
                   <th className="py-3.5 px-4 font-semibold">Configured Variants</th>
                   <th className="py-3.5 px-4 font-semibold">Badges</th>
@@ -434,7 +443,7 @@ export default function AdminModelsPage() {
                     </td>
                     <td className="py-3.5 px-4">
                       <div className="font-semibold text-cyan-400">{m.brandName}</div>
-                      <div className="text-slate-500 text-[10px]">{m.series || m.categoryName}</div>
+                      <div className="text-slate-500 text-[10px]">{m.categoryName}</div>
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="font-mono font-extrabold text-sm text-emerald-400">
@@ -526,23 +535,18 @@ export default function AdminModelsPage() {
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Series / Sub-brand</label>
-                <input
-                  type="text"
-                  placeholder="e.g. iPhone 16 Series"
-                  value={series}
-                  onChange={(e) => setSeries(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white"
-                />
-              </div>
-
-              <div>
                 <label className="block text-slate-300 font-semibold mb-1">Base Buyback Price (₹) *</label>
                 <input
                   type="number"
                   required
                   value={basePrice}
-                  onChange={(e) => setBasePrice(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setBasePrice(val);
+                    if (variantsList.length === 1 && !variantsList[0].basePrice) {
+                      setVariantsList([{ ...variantsList[0], basePrice: Number(val) }]);
+                    }
+                  }}
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-emerald-500/40 text-emerald-400 font-bold"
                 />
               </div>
@@ -561,6 +565,162 @@ export default function AdminModelsPage() {
                   <span>{uploading ? 'Uploading...' : 'Upload Device Image'}</span>
                   <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
                 </label>
+              </div>
+            </div>
+
+            {/* RAM & Storage Configurations Section */}
+            <div className="pt-3 border-t border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <span>RAM & Storage Configurations</span>
+                    <span className="px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-500/30 text-[10px] font-mono">
+                      {variantsList.length} Option(s)
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    Add RAM & Storage options with individual buyback prices for this model.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVariantsList([
+                      ...variantsList,
+                      {
+                        name: '8GB / 128GB',
+                        ram: '8GB',
+                        storage: '128GB',
+                        basePrice: Number(basePrice) || 45000,
+                      },
+                    ]);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-cyan-400/20 hover:bg-cyan-400/30 text-cyan-300 text-xs font-bold flex items-center gap-1.5 border border-cyan-400/30 transition-all self-start sm:self-auto"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add RAM / Storage</span>
+                </button>
+              </div>
+
+              {/* Quick Add Presets */}
+              <div className="flex flex-wrap items-center gap-1.5 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Quick Add:</span>
+                {[
+                  { ram: '6GB', storage: '128GB' },
+                  { ram: '8GB', storage: '128GB' },
+                  { ram: '8GB', storage: '256GB' },
+                  { ram: '12GB', storage: '256GB' },
+                  { ram: '12GB', storage: '512GB' },
+                  { ram: '16GB', storage: '512GB' },
+                  { ram: '16GB', storage: '1TB' },
+                ].map((preset) => (
+                  <button
+                    key={`${preset.ram}-${preset.storage}`}
+                    type="button"
+                    onClick={() => {
+                      const exists = variantsList.some(
+                        (v) => (v.ram || '').toLowerCase() === preset.ram.toLowerCase() && (v.storage || '').toLowerCase() === preset.storage.toLowerCase()
+                      );
+                      if (!exists) {
+                        setVariantsList([
+                          ...variantsList,
+                          {
+                            name: `${preset.ram} / ${preset.storage}`,
+                            ram: preset.ram,
+                            storage: preset.storage,
+                            basePrice: Number(basePrice) || 45000,
+                          },
+                        ]);
+                      }
+                    }}
+                    className="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono transition-colors"
+                  >
+                    + {preset.ram}/{preset.storage}
+                  </button>
+                ))}
+              </div>
+
+              {/* Variants Rows */}
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {variantsList.map((variant, idx) => (
+                  <div
+                    key={variant.id || idx}
+                    className="p-3 rounded-xl bg-slate-950 border border-slate-800 grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center"
+                  >
+                    <div className="sm:col-span-3">
+                      <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">RAM</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 8GB"
+                        value={variant.ram || ''}
+                        onChange={(e) => {
+                          const updated = [...variantsList];
+                          const newRam = e.target.value;
+                          updated[idx] = {
+                            ...updated[idx],
+                            ram: newRam,
+                            name: `${newRam ? newRam + ' / ' : ''}${updated[idx].storage || ''}`.trim(),
+                          };
+                          setVariantsList(updated);
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-4">
+                      <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">Storage</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 128GB or 256GB"
+                        value={variant.storage || ''}
+                        onChange={(e) => {
+                          const updated = [...variantsList];
+                          const newStorage = e.target.value;
+                          updated[idx] = {
+                            ...updated[idx],
+                            storage: newStorage,
+                            name: `${updated[idx].ram ? updated[idx].ram + ' / ' : ''}${newStorage}`.trim(),
+                          };
+                          setVariantsList(updated);
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-4">
+                      <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">Variant Quote (₹)</label>
+                      <input
+                        type="number"
+                        placeholder="Price"
+                        value={variant.basePrice ?? ''}
+                        onChange={(e) => {
+                          const updated = [...variantsList];
+                          updated[idx] = {
+                            ...updated[idx],
+                            basePrice: Number(e.target.value),
+                          };
+                          setVariantsList(updated);
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-emerald-500/40 text-emerald-400 text-xs font-mono font-bold focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-1 flex justify-end self-end sm:pb-1">
+                      {variantsList.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVariantsList(variantsList.filter((_, i) => i !== idx));
+                          }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition-colors"
+                          title="Remove this RAM/Storage configuration"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 

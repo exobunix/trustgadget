@@ -157,20 +157,49 @@ export async function PATCH(request: NextRequest) {
         id
       );
 
-      // If variants provided, update base prices
+      // If variants provided, update, insert, or delete variants
       if (Array.isArray(variants) && variants.length > 0) {
-        variants.forEach((v: any) => {
-          if (v.id) {
+        const retainedIds: string[] = [];
+
+        variants.forEach((v: any, idx: number) => {
+          const isRealId = v.id && !String(v.id).startsWith('temp_') && !String(v.id).endsWith('_def');
+          const variantName = v.name || `${v.ram ? v.ram + ' / ' : ''}${v.storage || 'Standard'}`.trim();
+          const varPrice = v.basePrice ? Number(v.basePrice) : Number(basePrice || 0);
+
+          if (isRealId) {
+            retainedIds.push(v.id);
             db.prepare(`
               UPDATE variants
               SET name = COALESCE(?, name),
                   storage = COALESCE(?, storage),
                   ram = COALESCE(?, ram),
                   basePrice = COALESCE(?, basePrice)
-              WHERE id = ?
-            `).run(v.name || null, v.storage || null, v.ram || null, v.basePrice ? Number(v.basePrice) : null, v.id);
+              WHERE id = ? AND modelId = ?
+            `).run(variantName, v.storage || null, v.ram || null, varPrice, v.id, id);
+          } else {
+            const varId = `v_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`;
+            retainedIds.push(varId);
+            const varSlug = `${variantName}`.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            db.prepare(`
+              INSERT INTO variants (id, modelId, name, slug, ram, storage, basePrice, isDefault, isActive)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+            `).run(
+              varId,
+              id,
+              variantName,
+              varSlug,
+              v.ram || null,
+              v.storage || null,
+              varPrice,
+              idx === 0 ? 1 : 0
+            );
           }
         });
+
+        if (retainedIds.length > 0) {
+          const placeholders = retainedIds.map(() => '?').join(',');
+          db.prepare(`DELETE FROM variants WHERE modelId = ? AND id NOT IN (${placeholders})`).run(id, ...retainedIds);
+        }
       }
     });
 

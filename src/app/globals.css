@@ -75,6 +75,29 @@ html:not(.dark) {
     background-color: rgba(255, 255, 255, 0.96) !important;
   }
 
+  .bg-slate-800,
+  button.bg-slate-800 {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+  }
+  .bg-slate-800\/90,
+  .bg-slate-800\/80,
+  .bg-slate-800\/60,
+  .bg-slate-800\/40,
+  .bg-slate-800\/30 {
+    background-color: rgba(241, 245, 249, 0.9) !important;
+    color: #0f172a !important;
+  }
+  .bg-slate-700 {
+    background-color: #e2e8f0 !important;
+    color: #0f172a !important;
+  }
+  .hover\:bg-slate-800:hover,
+  .hover\:bg-slate-700:hover {
+    background-color: #e2e8f0 !important;
+  }
+
   /* Borders in Light Mode */
   .border-slate-900,
   .border-slate-800,

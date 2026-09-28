@@ -6,6 +6,7 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 
 import { GlobalNotificationBanner } from '@/components/common/GlobalNotificationBanner';
+import { WhatsAppFloatingButton } from '@/components/common/WhatsAppFloatingButton';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -26,6 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Header />
       <main className="flex-1 pt-16">{children}</main>
       <Footer />
+      <WhatsAppFloatingButton />
     </>
   );
 }

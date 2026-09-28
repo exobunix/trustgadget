@@ -683,27 +683,10 @@ function SellPageContent() {
                     </div>
 
                     {/* Answer Option Cards Grid (Screenshot 5 Match) */}
+                    {/* Answer Option Cards Grid (Zero Deductions Disclosed) */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
                       {currentQ.answers.map((ans) => {
                         const isSelected = answers[currentQ.code] === ans.code;
-                        const isNegative = ans.adjustmentValue < 0;
-                        const isPositive = ans.adjustmentValue > 0;
-                        const isPercentage = ans.adjustmentType === 'PERCENTAGE';
-
-                        let adjustmentLabel = '₹0';
-                        if (isPercentage) {
-                          if (ans.adjustmentValue < 0) {
-                            adjustmentLabel = `${Math.abs(ans.adjustmentValue)}% will be deducted`;
-                          } else if (ans.adjustmentValue > 0) {
-                            adjustmentLabel = `+${ans.adjustmentValue}% bonus`;
-                          }
-                        } else {
-                          if (ans.adjustmentValue < 0) {
-                            adjustmentLabel = `-₹${Math.abs(ans.adjustmentValue).toLocaleString('en-IN')}`;
-                          } else if (ans.adjustmentValue > 0) {
-                            adjustmentLabel = `+₹${ans.adjustmentValue.toLocaleString('en-IN')}`;
-                          }
-                        }
 
                         return (
                           <button
@@ -715,36 +698,32 @@ function SellPageContent() {
                                 setCurrentQuestionIdx(currentQuestionIdx + 1);
                               }
                             }}
-                            className={`p-5 rounded-2xl border text-center transition-all flex flex-col items-center justify-center space-y-2 group ${
+                            className={`p-5 rounded-2xl border text-center transition-all flex flex-col items-center justify-center space-y-2.5 group ${
                               isSelected
                                 ? 'border-emerald-500 bg-emerald-950/40 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-500/10'
                                 : 'border-slate-800 bg-slate-950 hover:border-slate-700 hover:bg-slate-900'
                             }`}
                           >
                             <div
-                              className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${
-                                isNegative
-                                  ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                                  : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                              className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                                isSelected
+                                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/30'
+                                  : 'bg-slate-900 border border-slate-700 text-slate-400 group-hover:border-slate-500 group-hover:text-white'
                               }`}
                             >
-                              {isNegative ? <X className="w-5 h-5" /> : <Check className="w-5 h-5" />}
+                              {isSelected ? (
+                                <Check className="w-4 h-4 stroke-[3]" />
+                              ) : (
+                                <span className="w-2 h-2 rounded-full bg-slate-600 group-hover:bg-slate-400" />
+                              )}
                             </div>
 
-                            <div className="text-xs font-bold text-white">{ans.label}</div>
+                            <div className="text-sm font-bold text-white">{ans.label}</div>
                             {ans.description && (
-                              <div className="text-[11px] text-slate-400 leading-tight">
+                              <div className="text-xs text-slate-400 leading-tight">
                                 {ans.description}
                               </div>
                             )}
-
-                            <div
-                              className={`text-xs font-mono font-extrabold ${
-                                isNegative ? 'text-rose-400' : isPositive ? 'text-emerald-400' : 'text-slate-500'
-                              }`}
-                            >
-                              {adjustmentLabel}
-                            </div>
                           </button>
                         );
                       })}
@@ -823,49 +802,43 @@ function SellPageContent() {
                   </span>
                 </div>
 
-                {/* Real-time Line-by-Line Adjustments (Screenshot 5 Match) */}
-                {valuationResult?.adjustments && (
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1 text-xs">
-                    {valuationResult.adjustments.map((adj: any, i: number) => {
-                      const isNeg = adj.calculatedAmount < 0;
-                      const isPos = adj.calculatedAmount > 0;
-                      if (adj.calculatedAmount === 0) return null;
-
-                      return (
-                        <div key={i} className="flex justify-between items-start py-0.5">
-                          <span className={`text-[11px] flex items-center gap-1.5 ${isNeg ? 'text-rose-300' : 'text-emerald-300'}`}>
-                            {isNeg ? <X className="w-3 h-3 text-rose-400 shrink-0" /> : <Check className="w-3 h-3 text-emerald-400 shrink-0" />}
-                            <span className="truncate max-w-[200px]">{adj.answerLabel}</span>
-                          </span>
-                          <span className={`font-mono font-bold text-[11px] shrink-0 ${isNeg ? 'text-rose-400' : 'text-emerald-400'}`}>
-                            {adj.adjustmentType === 'PERCENTAGE'
-                              ? isNeg
-                                ? `-${Math.abs(adj.adjustmentValue)}% (-₹${Math.abs(adj.calculatedAmount).toLocaleString('en-IN')})`
-                                : `+${adj.adjustmentValue}% (+₹${adj.calculatedAmount.toLocaleString('en-IN')})`
-                              : isPos
-                              ? `+₹${adj.calculatedAmount.toLocaleString('en-IN')}`
-                              : `-₹${Math.abs(adj.calculatedAmount).toLocaleString('en-IN')}`}
-                          </span>
-                        </div>
-                      );
-                    })}
-
-                    {valuationResult.adjustments.filter((a: any) => a.calculatedAmount !== 0).length === 0 && (
-                      <div className="py-2 px-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400">
-                        Answer condition questions to view line-by-line price adjustments.
+                {/* Condition Assessment Overview (Zero Deductions Disclosed) */}
+                <div className="space-y-2.5 py-1 text-xs">
+                  <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>Condition Evaluation</span>
+                      <span className="font-mono font-bold text-cyan-400">
+                        {Object.keys(answers).length} of {questions.length} Answered
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-cyan-400 to-emerald-400 h-full transition-all duration-300"
+                        style={{
+                          width: `${questions.length > 0 ? (Object.keys(answers).length / questions.length) * 100 : 0}%`,
+                        }}
+                      />
+                    </div>
+                    {Object.keys(answers).length === questions.length ? (
+                      <div className="text-[11px] text-emerald-400 flex items-center gap-1.5 font-semibold pt-0.5">
+                        <Check className="w-3.5 h-3.5 stroke-[3]" /> All functional parameters evaluated
                       </div>
-                    )}
-
-                    {appliedCoupon && (
-                      <div className="flex justify-between items-center py-1 text-emerald-400 font-bold border-t border-slate-800">
-                        <span className="flex items-center gap-1">
-                          <Tag className="w-3 h-3" /> Coupon: {appliedCoupon.code}
-                        </span>
-                        <span>+₹{appliedCoupon.bonusAmount.toLocaleString('en-IN')}</span>
+                    ) : (
+                      <div className="text-[11px] text-slate-400 pt-0.5">
+                        Complete all questions to finalize your guaranteed doorstep cash quote.
                       </div>
                     )}
                   </div>
-                )}
+
+                  {appliedCoupon && (
+                    <div className="flex justify-between items-center py-2 px-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 font-bold text-xs">
+                      <span className="flex items-center gap-1">
+                        <Tag className="w-3.5 h-3.5 text-emerald-400" /> Coupon: {appliedCoupon.code}
+                      </span>
+                      <span className="font-mono">+₹{appliedCoupon.bonusAmount.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                </div>
 
                 {/* Promo Coupon Input */}
                 <form onSubmit={handleApplyCoupon} className="pt-2 flex items-center gap-2">
