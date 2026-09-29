@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, dbHelpers } from '@/lib/db';
+import { revalidatePath } from 'next/cache';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
   try {
@@ -18,7 +22,10 @@ export async function GET() {
       specifications: m.specifications ? JSON.parse(m.specifications) : {},
     }));
 
-    return NextResponse.json({ success: true, data: enriched });
+    return NextResponse.json(
+      { success: true, data: enriched },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -130,6 +137,10 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Model ID is required' }, { status: 400 });
     }
 
+    const parsedBasePrice = basePrice !== undefined && basePrice !== null && !isNaN(Number(basePrice))
+      ? Number(basePrice)
+      : null;
+
     const transaction = db.transaction(() => {
       db.prepare(`
         UPDATE models
@@ -141,6 +152,8 @@ export async function PATCH(request: NextRequest) {
             imageUrl = COALESCE(?, imageUrl),
             releaseYear = COALESCE(?, releaseYear),
             basePrice = COALESCE(?, basePrice),
+            minPrice = COALESCE(?, minPrice),
+            maxPrice = COALESCE(?, maxPrice),
             isPopular = COALESCE(?, isPopular),
             updatedAt = CURRENT_TIMESTAMP
         WHERE id = ?
@@ -152,7 +165,9 @@ export async function PATCH(request: NextRequest) {
         series || null,
         imageUrl || null,
         releaseYear ? Number(releaseYear) : null,
-        basePrice ? Number(basePrice) : null,
+        parsedBasePrice,
+        parsedBasePrice ? Math.round(parsedBasePrice * 0.7) : null,
+        parsedBasePrice ? Math.round(parsedBasePrice * 1.25) : null,
         isPopular !== undefined ? (isPopular ? 1 : 0) : null,
         id
       );
@@ -164,7 +179,9 @@ export async function PATCH(request: NextRequest) {
         variants.forEach((v: any, idx: number) => {
           const isRealId = v.id && !String(v.id).startsWith('temp_') && !String(v.id).endsWith('_def');
           const variantName = v.name || `${v.ram ? v.ram + ' / ' : ''}${v.storage || 'Standard'}`.trim();
-          const varPrice = v.basePrice ? Number(v.basePrice) : Number(basePrice || 0);
+          const varPrice = v.basePrice !== undefined && v.basePrice !== null && !isNaN(Number(v.basePrice)) && Number(v.basePrice) > 0
+            ? Number(v.basePrice)
+            : (parsedBasePrice || 0);
 
           if (isRealId) {
             retainedIds.push(v.id);
@@ -173,16 +190,28 @@ export async function PATCH(request: NextRequest) {
               SET name = COALESCE(?, name),
                   storage = COALESCE(?, storage),
                   ram = COALESCE(?, ram),
-                  basePrice = COALESCE(?, basePrice)
+                  basePrice = ?,
+                  minPrice = ?,
+                  maxPrice = ?,
+                  updatedAt = CURRENT_TIMESTAMP
               WHERE id = ? AND modelId = ?
-            `).run(variantName, v.storage || null, v.ram || null, varPrice, v.id, id);
+            `).run(
+              variantName,
+              v.storage || null,
+              v.ram || null,
+              varPrice,
+              Math.round(varPrice * 0.7),
+              Math.round(varPrice * 1.25),
+              v.id,
+              id
+            );
           } else {
             const varId = `v_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`;
             retainedIds.push(varId);
             const varSlug = `${variantName}`.toLowerCase().replace(/[^a-z0-9]+/g, '-');
             db.prepare(`
-              INSERT INTO variants (id, modelId, name, slug, ram, storage, basePrice, isDefault, isActive)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+              INSERT INTO variants (id, modelId, name, slug, ram, storage, basePrice, minPrice, maxPrice, isDefault, isActive)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
             `).run(
               varId,
               id,
@@ -191,6 +220,8 @@ export async function PATCH(request: NextRequest) {
               v.ram || null,
               v.storage || null,
               varPrice,
+              Math.round(varPrice * 0.7),
+              Math.round(varPrice * 1.25),
               idx === 0 ? 1 : 0
             );
           }
@@ -200,20 +231,39 @@ export async function PATCH(request: NextRequest) {
           const placeholders = retainedIds.map(() => '?').join(',');
           db.prepare(`DELETE FROM variants WHERE modelId = ? AND id NOT IN (${placeholders})`).run(id, ...retainedIds);
         }
+      } else if (parsedBasePrice) {
+        // If no variants list was provided, update existing variants for this model
+        db.prepare(`
+          UPDATE variants
+          SET basePrice = ?,
+              minPrice = ?,
+              maxPrice = ?,
+              updatedAt = CURRENT_TIMESTAMP
+          WHERE modelId = ?
+        `).run(parsedBasePrice, Math.round(parsedBasePrice * 0.7), Math.round(parsedBasePrice * 1.25), id);
       }
     });
 
     transaction();
+
+    try {
+      revalidatePath('/admin/catalog/models');
+      revalidatePath('/sell');
+      revalidatePath('/');
+    } catch (e) {}
 
     dbHelpers.createAuditLog({
       adminName: adminName || 'Admin User',
       action: 'UPDATE_MODEL',
       entityType: 'Model',
       entityId: id,
-      details: `Updated model details for "${name || id}"`,
+      details: `Updated model details for "${name || id}" with Base Price ₹${Number(parsedBasePrice || 0).toLocaleString('en-IN')}`,
     });
 
-    return NextResponse.json({ success: true, message: 'Model updated successfully' });
+    return NextResponse.json(
+      { success: true, message: 'Model updated successfully' },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

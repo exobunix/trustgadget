@@ -35,7 +35,7 @@ export default function ModelValuationPage() {
   useEffect(() => {
     async function load() {
       try {
-        const modRes = await fetch(`/api/catalog/model/${modelSlug}`);
+        const modRes = await fetch(`/api/catalog/model/${modelSlug}?_t=${Date.now()}`, { cache: 'no-store' });
         const modData = await modRes.json();
         if (modData.success) {
           setModel(modData.data);

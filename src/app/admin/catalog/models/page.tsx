@@ -23,6 +23,7 @@ export default function AdminModelsPage() {
   const [releaseYear, setReleaseYear] = useState('2024');
   const [basePrice, setBasePrice] = useState('45000');
   const [isPopular, setIsPopular] = useState(true);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [variantsList, setVariantsList] = useState<any[]>([
     { name: '128 GB', storage: '128GB', ram: '8GB', basePrice: 45000 },
     { name: '256 GB', storage: '256GB', ram: '8GB', basePrice: 49000 },
@@ -33,10 +34,11 @@ export default function AdminModelsPage() {
   const fetchModels = async () => {
     setLoading(true);
     try {
+      const cacheBust = `?_t=${Date.now()}`;
       const [mRes, bRes, cRes] = await Promise.all([
-        fetch('/api/admin/catalog/models'),
-        fetch('/api/admin/catalog/brands'),
-        fetch('/api/catalog/categories'),
+        fetch(`/api/admin/catalog/models${cacheBust}`, { cache: 'no-store' }),
+        fetch(`/api/admin/catalog/brands${cacheBust}`, { cache: 'no-store' }),
+        fetch(`/api/catalog/categories${cacheBust}`, { cache: 'no-store' }),
       ]);
       const mData = await mRes.json();
       const bData = await bRes.json();
@@ -64,6 +66,7 @@ export default function AdminModelsPage() {
 
   const openAddModal = () => {
     setEditingModel(null);
+    setSelectedVariantId(null);
     setName('');
     setSlug('');
     setSeries('');
@@ -78,19 +81,54 @@ export default function AdminModelsPage() {
     setShowModal(true);
   };
 
-  const openEditModal = (m: any) => {
+  const openEditModal = (m: any, targetVariantId?: string) => {
     setEditingModel(m);
-    setName(m.name);
-    setSlug(m.slug);
-    setBrandId(m.brandId);
-    setCategoryId(m.categoryId);
+    setSelectedVariantId(targetVariantId || null);
+    setName(m.name || '');
+    setSlug(m.slug || '');
+    setBrandId(m.brandId || '');
+    setCategoryId(m.categoryId || '');
     setSeries(m.series || '');
     setImageUrl(m.imageUrl || '');
     setReleaseYear(String(m.releaseYear || 2024));
-    setBasePrice(String(m.basePrice || 45000));
+
+    const targetVar = targetVariantId ? m.variants?.find((v: any) => v.id === targetVariantId) : null;
+    const initialPrice = targetVar?.basePrice || m.basePrice || 45000;
+    setBasePrice(String(initialPrice));
     setIsPopular(m.isPopular === 1);
-    setVariantsList(m.variants?.length > 0 ? m.variants : [{ name: 'Standard', storage: '128GB', ram: '8GB', basePrice: m.basePrice }]);
+
+    const initialVariants = m.variants && m.variants.length > 0
+      ? m.variants.map((v: any) => ({
+          ...v,
+          basePrice: v.basePrice !== undefined && v.basePrice !== null ? Number(v.basePrice) : Number(initialPrice),
+        }))
+      : [{ name: 'Standard', storage: '128GB', ram: '8GB', basePrice: Number(initialPrice) }];
+
+    setVariantsList(initialVariants);
     setShowModal(true);
+  };
+
+  const handleBasePriceChange = (newVal: string) => {
+    setBasePrice(newVal);
+    const num = Number(newVal);
+    if (!isNaN(num) && num > 0) {
+      setVariantsList((prev) =>
+        prev.map((v, idx) => {
+          // If single variant or if this variant was explicitly targeted, or if all variants had same price, or first variant:
+          if (prev.length === 1 || v.id === selectedVariantId || idx === 0) {
+            return { ...v, basePrice: num };
+          }
+          return v;
+        })
+      );
+    }
+  };
+
+  const applyBasePriceToAllVariants = () => {
+    const num = Number(basePrice) || 0;
+    if (num > 0) {
+      setVariantsList((prev) => prev.map((v) => ({ ...v, basePrice: num })));
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,6 +163,16 @@ export default function AdminModelsPage() {
 
     try {
       const selectedBrand = brands.find((b) => b.id === brandId);
+      const parsedBasePrice = Number(basePrice) || 0;
+
+      // Ensure every variant has a positive valid basePrice
+      const normalizedVariants = variantsList.map((v) => ({
+        ...v,
+        basePrice: v.basePrice && !isNaN(Number(v.basePrice)) && Number(v.basePrice) > 0
+          ? Number(v.basePrice)
+          : parsedBasePrice,
+      }));
+
       const payload = {
         name,
         slug: slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
@@ -133,30 +181,41 @@ export default function AdminModelsPage() {
         series,
         imageUrl,
         releaseYear: Number(releaseYear),
-        basePrice: Number(basePrice),
+        basePrice: parsedBasePrice,
         isPopular,
-        variants: variantsList,
+        variants: normalizedVariants,
         adminName: 'Super Admin',
       };
 
       if (editingModel) {
-        await fetch('/api/admin/catalog/models', {
+        const res = await fetch('/api/admin/catalog/models', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: editingModel.id, ...payload }),
         });
+        const data = await res.json();
+        if (!data.success) {
+          alert('Failed to update model: ' + (data.error || 'Server error'));
+          return;
+        }
       } else {
-        await fetch('/api/admin/catalog/models', {
+        const res = await fetch('/api/admin/catalog/models', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
+        const data = await res.json();
+        if (!data.success) {
+          alert('Failed to create model: ' + (data.error || 'Server error'));
+          return;
+        }
       }
 
       setShowModal(false);
-      fetchModels();
-    } catch (e) {
+      await fetchModels();
+    } catch (e: any) {
       console.error(e);
+      alert('Error updating model: ' + e.message);
     } finally {
       setSubmitting(false);
     }
@@ -388,7 +447,7 @@ export default function AdminModelsPage() {
                       </td>
                       <td className="py-3 px-4 text-right space-x-2">
                         <button
-                          onClick={() => openEditModal(v.parentModel)}
+                          onClick={() => openEditModal(v.parentModel, v.id)}
                           className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-400 transition-colors text-[11px] font-medium inline-flex items-center gap-1"
                           title="Edit Model & Variants"
                         >
@@ -535,20 +594,27 @@ export default function AdminModelsPage() {
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Base Buyback Price (₹) *</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-300 font-semibold">Base Buyback Price (₹) *</label>
+                  <button
+                    type="button"
+                    onClick={applyBasePriceToAllVariants}
+                    className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold underline cursor-pointer"
+                    title="Apply this base price to all RAM/Storage variants below"
+                  >
+                    Sync to all variants
+                  </button>
+                </div>
                 <input
                   type="number"
                   required
                   value={basePrice}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setBasePrice(val);
-                    if (variantsList.length === 1 && !variantsList[0].basePrice) {
-                      setVariantsList([{ ...variantsList[0], basePrice: Number(val) }]);
-                    }
-                  }}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-emerald-500/40 text-emerald-400 font-bold"
+                  onChange={(e) => handleBasePriceChange(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-emerald-500/40 text-emerald-400 font-bold focus:outline-none focus:border-cyan-400"
                 />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Updates model & base variant quote. Click "Sync to all variants" to overwrite all variants below.
+                </p>
               </div>
 
               <div className="sm:col-span-2">
@@ -688,20 +754,28 @@ export default function AdminModelsPage() {
                     </div>
 
                     <div className="sm:col-span-4">
-                      <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">Variant Quote (₹)</label>
+                      <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
+                        Variant Quote (₹) {variant.id === selectedVariantId ? '— Selected' : ''}
+                      </label>
                       <input
                         type="number"
                         placeholder="Price"
                         value={variant.basePrice ?? ''}
                         onChange={(e) => {
                           const updated = [...variantsList];
+                          const newPrice = Number(e.target.value);
                           updated[idx] = {
                             ...updated[idx],
-                            basePrice: Number(e.target.value),
+                            basePrice: isNaN(newPrice) ? 0 : newPrice,
                           };
                           setVariantsList(updated);
+                          if (idx === 0 || variant.id === selectedVariantId || variantsList.length === 1) {
+                            setBasePrice(String(newPrice || ''));
+                          }
                         }}
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-emerald-500/40 text-emerald-400 text-xs font-mono font-bold focus:outline-none focus:border-emerald-500"
+                        className={`w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border text-emerald-400 text-xs font-mono font-bold focus:outline-none ${
+                          variant.id === selectedVariantId ? 'border-cyan-400 ring-1 ring-cyan-400/40' : 'border-emerald-500/40 focus:border-emerald-500'
+                        }`}
                       />
                     </div>
 

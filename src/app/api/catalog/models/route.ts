@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, dbHelpers } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+const noCacheHeaders = { 'Cache-Control': 'no-store, max-age=0' };
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -12,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     if (popularOnly) {
       const models = dbHelpers.getPopularModels(limit);
-      return NextResponse.json({ success: true, data: models });
+      return NextResponse.json({ success: true, data: models }, { headers: noCacheHeaders });
     }
 
     let resolvedBrandId = brandId;
@@ -23,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     if (resolvedBrandId) {
       const models = dbHelpers.getModelsByBrand(resolvedBrandId);
-      return NextResponse.json({ success: true, data: models });
+      return NextResponse.json({ success: true, data: models }, { headers: noCacheHeaders });
     }
 
     if (categoryId) {
@@ -35,7 +40,7 @@ export async function GET(request: NextRequest) {
         ORDER BY m.isPopular DESC, m.basePrice DESC
         LIMIT ?
       `).all(categoryId, limit);
-      return NextResponse.json({ success: true, data: models });
+      return NextResponse.json({ success: true, data: models }, { headers: noCacheHeaders });
     }
 
     const allModels = db.prepare(`
@@ -48,8 +53,8 @@ export async function GET(request: NextRequest) {
       LIMIT ?
     `).all(limit);
 
-    return NextResponse.json({ success: true, data: allModels });
+    return NextResponse.json({ success: true, data: allModels }, { headers: noCacheHeaders });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 500, headers: noCacheHeaders });
   }
 }

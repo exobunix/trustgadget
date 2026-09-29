@@ -74,6 +74,31 @@ export default function CheckoutPage() {
         try {
           const parsed = JSON.parse(activeData);
           setOrderSummary(parsed);
+
+          // Verify with live catalog to prevent stale session storage prices
+          if (parsed.modelId) {
+            fetch(`/api/catalog/model/${parsed.modelId}?_t=${Date.now()}`, { cache: 'no-store' })
+              .then((r) => r.json())
+              .then((data) => {
+                if (data.success && data.data) {
+                  const liveModel = data.data;
+                  const liveVariant = liveModel.variants?.find((v: any) => v.id === parsed.variantId) || liveModel.variants?.[0];
+                  const currentBasePrice = liveVariant?.basePrice || liveModel.basePrice;
+                  if (currentBasePrice && currentBasePrice !== parsed.basePrice) {
+                    const priceDiff = currentBasePrice - parsed.basePrice;
+                    const updated = {
+                      ...parsed,
+                      basePrice: currentBasePrice,
+                      estimatedPrice: Math.max(500, (parsed.estimatedPrice || currentBasePrice) + priceDiff),
+                    };
+                    setOrderSummary(updated);
+                    sessionStorage.setItem('tmg_checkout_order', JSON.stringify(updated));
+                    localStorage.setItem('tmg_current_tradein', JSON.stringify(updated));
+                  }
+                }
+              })
+              .catch(() => {});
+          }
         } catch (e) {
           console.error(e);
         }
@@ -605,6 +630,14 @@ export default function CheckoutPage() {
             </div>
             <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
               Our executive will verify your gadget and transfer the full amount directly to your account before taking possession.
+            </p>
+          </div>
+
+          {/* Physical Inspection Notice */}
+          <div className="p-3.5 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-500/30 text-xs flex items-start gap-2.5 shadow-sm">
+            <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-amber-900 dark:text-amber-200 leading-relaxed font-medium">
+              <span className="font-bold">Note:</span> The final price will be confirmed after a physical inspection of the device by our partner.
             </p>
           </div>
         </div>
