@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { FileCode, Plus, Search, Smartphone, Laptop, Edit, Trash2, Upload, ExternalLink } from 'lucide-react';
+import { FileCode, Plus, Search, Smartphone, Laptop, Edit, Trash2, Upload, ExternalLink, Download } from 'lucide-react';
 
 export default function AdminModelsPage() {
   const [models, setModels] = useState<any[]>([]);
@@ -172,13 +172,31 @@ export default function AdminModelsPage() {
       const effectiveCategoryId = selectedBrand?.categoryId || categoryId || categories[0]?.id || 'cat_smartphone';
       const parsedBasePrice = Number(basePrice) || 0;
 
-      // Ensure every variant has a positive valid basePrice
-      const normalizedVariants = variantsList.map((v) => ({
-        ...v,
-        basePrice: v.basePrice && !isNaN(Number(v.basePrice)) && Number(v.basePrice) > 0
-          ? Number(v.basePrice)
-          : parsedBasePrice,
-      }));
+      // Ensure every variant has a positive valid basePrice and unique disambiguated slug
+      const seenSlugs = new Set<string>();
+      const normalizedVariants = variantsList.map((v, idx) => {
+        const variantName = v.name || `${v.ram ? v.ram + ' / ' : ''}${v.storage || 'Standard'}`.trim();
+        const rawSlug = (v.slug || variantName || `v-${idx + 1}`)
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '') || `v-${idx + 1}`;
+        let uniqueSlug = rawSlug;
+        let counter = 2;
+        while (seenSlugs.has(uniqueSlug)) {
+          uniqueSlug = `${rawSlug}-${counter}`;
+          counter++;
+        }
+        seenSlugs.add(uniqueSlug);
+
+        return {
+          ...v,
+          name: variantName,
+          slug: uniqueSlug,
+          basePrice: v.basePrice && !isNaN(Number(v.basePrice)) && Number(v.basePrice) > 0
+            ? Number(v.basePrice)
+            : parsedBasePrice,
+        };
+      });
 
       const payload = {
         name,
@@ -294,6 +312,16 @@ export default function AdminModelsPage() {
       (v.series && v.series.toLowerCase().includes(search.toLowerCase()))
   );
 
+  const exportCatalogJson = () => {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(models, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `trustmygadget_catalog_backup_${new Date().toISOString().slice(0, 10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto font-sans pb-12">
       {/* Header */}
@@ -310,13 +338,24 @@ export default function AdminModelsPage() {
           </p>
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="px-4 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold text-xs shadow-md shadow-cyan-500/20 flex items-center gap-2 self-start"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add New Device Model</span>
-        </button>
+        <div className="flex items-center gap-2 self-start flex-wrap">
+          <button
+            type="button"
+            onClick={exportCatalogJson}
+            className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+            title="Download full catalog backup with all models and variants as JSON"
+          >
+            <Download className="w-4 h-4 text-cyan-400" />
+            <span>Export Catalog Backup</span>
+          </button>
+          <button
+            onClick={openAddModal}
+            className="px-4 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold text-xs shadow-md shadow-cyan-500/20 flex items-center gap-2 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add New Device Model</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats Summary Strip (Highlighting >500 Devices in Database) */}
@@ -665,17 +704,35 @@ export default function AdminModelsPage() {
                 <button
                   type="button"
                   onClick={() => {
+                    const presets = [
+                      { ram: '6GB', storage: '128GB' },
+                      { ram: '8GB', storage: '128GB' },
+                      { ram: '8GB', storage: '256GB' },
+                      { ram: '12GB', storage: '256GB' },
+                      { ram: '12GB', storage: '512GB' },
+                      { ram: '16GB', storage: '512GB' },
+                      { ram: '16GB', storage: '1TB' },
+                    ];
+                    const nextPreset = presets.find(
+                      (p) => !variantsList.some(
+                        (v) => (v.ram || '').trim().toLowerCase() === p.ram.toLowerCase() && (v.storage || '').trim().toLowerCase() === p.storage.toLowerCase()
+                      )
+                    ) || {
+                      ram: '8GB',
+                      storage: `${128 * (variantsList.length + 1)}GB`,
+                    };
+
                     setVariantsList([
                       ...variantsList,
                       {
-                        name: '8GB / 128GB',
-                        ram: '8GB',
-                        storage: '128GB',
+                        name: `${nextPreset.ram} / ${nextPreset.storage}`,
+                        ram: nextPreset.ram,
+                        storage: nextPreset.storage,
                         basePrice: Number(basePrice) || 45000,
                       },
                     ]);
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-cyan-400/20 hover:bg-cyan-400/30 text-cyan-300 text-xs font-bold flex items-center gap-1.5 border border-cyan-400/30 transition-all self-start sm:self-auto"
+                  className="px-3 py-1.5 rounded-xl bg-cyan-400/20 hover:bg-cyan-400/30 text-cyan-300 text-xs font-bold flex items-center gap-1.5 border border-cyan-400/30 transition-all self-start sm:self-auto cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add RAM / Storage</span>
@@ -720,15 +777,22 @@ export default function AdminModelsPage() {
                 ))}
               </div>
 
-              {/* Variants Rows */}
               <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                {variantsList.map((variant, idx) => (
+                {variantsList.map((variant, idx) => {
+                  const isDuplicate = variantsList.filter(
+                    (v) => (v.ram || '').trim().toLowerCase() === (variant.ram || '').trim().toLowerCase() &&
+                           (v.storage || '').trim().toLowerCase() === (variant.storage || '').trim().toLowerCase()
+                  ).length > 1;
+
+                  return (
                   <div
                     key={variant.id || idx}
-                    className="p-3 rounded-xl bg-slate-950 border border-slate-800 grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center"
+                    className={`p-3 rounded-xl bg-slate-950 border ${isDuplicate ? 'border-amber-500/50 bg-amber-950/10' : 'border-slate-800'} grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center transition-colors`}
                   >
                     <div className="sm:col-span-3">
-                      <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">RAM</label>
+                      <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
+                        RAM {isDuplicate && <span className="text-[9px] text-amber-400 font-normal">!</span>}
+                      </label>
                       <input
                         type="text"
                         placeholder="e.g. 8GB"
@@ -808,7 +872,8 @@ export default function AdminModelsPage() {
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

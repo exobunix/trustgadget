@@ -19,7 +19,6 @@
 /build
 
 # database
-*.db
 *.db-journal
 *.db-wal
 *.db-shm

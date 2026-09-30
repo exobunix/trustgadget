@@ -81,7 +81,20 @@ export async function POST(request: NextRequest) {
     }
 
     const modelId = `m_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const modelSlug = slug ? slug.toLowerCase() : name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    let modelSlug = slug
+      ? slug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+      : name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    if (!modelSlug) modelSlug = `model-${Date.now()}`;
+
+    // Ensure modelSlug is unique within brand
+    let checkModel = db.prepare('SELECT id FROM models WHERE brandId = ? AND slug = ?').get(finalBrandId, modelSlug);
+    let modelSlugCounter = 2;
+    const baseModelSlug = modelSlug;
+    while (checkModel) {
+      modelSlug = `${baseModelSlug}-${modelSlugCounter}`;
+      modelSlugCounter++;
+      checkModel = db.prepare('SELECT id FROM models WHERE brandId = ? AND slug = ?').get(finalBrandId, modelSlug);
+    }
 
     const transaction = db.transaction(() => {
       db.prepare(`
@@ -108,31 +121,60 @@ export async function POST(request: NextRequest) {
 
       if (Array.isArray(variants) && variants.length > 0) {
         const insertVar = db.prepare(`
-          INSERT INTO variants (id, modelId, name, slug, ram, storage, processor, gpu, basePrice, isDefault, isActive)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+          INSERT OR REPLACE INTO variants (id, modelId, name, slug, ram, storage, processor, gpu, basePrice, minPrice, maxPrice, isDefault, isActive)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         `);
 
+        const seenSlugs = new Set<string>();
+
         variants.forEach((v: any, idx: number) => {
-          const varId = `v_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`;
+          const varId = v.id && !String(v.id).startsWith('temp_') && !String(v.id).endsWith('_def')
+            ? v.id
+            : `v_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`;
+
+          const variantName = v.name || `${v.ram ? v.ram + ' / ' : ''}${v.storage || 'Standard'}`.trim();
+          let rawSlug = (v.slug || variantName || `var-${idx + 1}`)
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '') || `var-${idx + 1}`;
+
+          let uniqueSlug = rawSlug;
+          let counter = 2;
+          while (seenSlugs.has(uniqueSlug)) {
+            uniqueSlug = `${rawSlug}-${counter}`;
+            counter++;
+          }
+          seenSlugs.add(uniqueSlug);
+
+          const varPrice = Number(v.basePrice) || Number(basePrice);
+
           insertVar.run(
             varId,
             modelId,
-            v.name,
-            v.slug ? v.slug.toLowerCase() : v.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            variantName,
+            uniqueSlug,
             v.ram || null,
             v.storage || null,
             v.processor || null,
             v.gpu || null,
-            Number(v.basePrice) || Number(basePrice),
+            varPrice,
+            Math.round(varPrice * 0.7),
+            Math.round(varPrice * 1.25),
             idx === 0 ? 1 : 0
           );
         });
       } else {
         // Create default variant
         db.prepare(`
-          INSERT INTO variants (id, modelId, name, slug, basePrice, isDefault, isActive)
-          VALUES (?, ?, 'Standard Variant', 'standard', ?, 1, 1)
-        `).run(`v_${Date.now()}_default`, modelId, Number(basePrice));
+          INSERT OR REPLACE INTO variants (id, modelId, name, slug, basePrice, minPrice, maxPrice, isDefault, isActive)
+          VALUES (?, ?, 'Standard Variant', 'standard', ?, ?, ?, 1, 1)
+        `).run(
+          `v_${Date.now()}_default`,
+          modelId,
+          Number(basePrice),
+          Math.round(Number(basePrice) * 0.7),
+          Math.round(Number(basePrice) * 1.25)
+        );
       }
     });
 
@@ -273,6 +315,8 @@ export async function PATCH(request: NextRequest) {
       if (Array.isArray(variants) && variants.length > 0) {
         const retainedIds: string[] = [];
 
+        const seenSlugs = new Set<string>();
+
         variants.forEach((v: any, idx: number) => {
           const isRealId = v.id && !String(v.id).startsWith('temp_') && !String(v.id).endsWith('_def');
           const variantName = v.name || `${v.ram ? v.ram + ' / ' : ''}${v.storage || 'Standard'}`.trim();
@@ -280,11 +324,24 @@ export async function PATCH(request: NextRequest) {
             ? Number(v.basePrice)
             : (parsedBasePrice || 0);
 
+          let rawSlug = (v.slug || variantName || `var-${idx + 1}`)
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '') || `var-${idx + 1}`;
+          let uniqueSlug = rawSlug;
+          let counter = 2;
+          while (seenSlugs.has(uniqueSlug)) {
+            uniqueSlug = `${rawSlug}-${counter}`;
+            counter++;
+          }
+          seenSlugs.add(uniqueSlug);
+
           let updated = false;
           if (isRealId) {
             const updateResult = db.prepare(`
               UPDATE variants
               SET name = COALESCE(?, name),
+                  slug = ?,
                   storage = COALESCE(?, storage),
                   ram = COALESCE(?, ram),
                   basePrice = ?,
@@ -294,6 +351,7 @@ export async function PATCH(request: NextRequest) {
               WHERE id = ? AND modelId = ?
             `).run(
               variantName,
+              uniqueSlug,
               v.storage || null,
               v.ram || null,
               varPrice,
@@ -311,7 +369,6 @@ export async function PATCH(request: NextRequest) {
           if (!updated) {
             const varId = (isRealId && v.id) ? v.id : `v_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`;
             retainedIds.push(varId);
-            const varSlug = `${variantName}`.toLowerCase().replace(/[^a-z0-9]+/g, '-');
             db.prepare(`
               INSERT OR REPLACE INTO variants (id, modelId, name, slug, ram, storage, basePrice, minPrice, maxPrice, isDefault, isActive)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
@@ -319,7 +376,7 @@ export async function PATCH(request: NextRequest) {
               varId,
               id,
               variantName,
-              varSlug,
+              uniqueSlug,
               v.ram || null,
               v.storage || null,
               varPrice,

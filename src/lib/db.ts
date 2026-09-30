@@ -23,7 +23,16 @@ const getDbPath = () => {
     if (!fs.existsSync(tmpDir)) {
       try { fs.mkdirSync(tmpDir, { recursive: true }); } catch (e) {}
     }
-    return path.join(tmpDir, 'trustmygadget.db');
+    const targetDbPath = path.join(tmpDir, 'trustmygadget.db');
+    const sourceDbPath = path.join(process.cwd(), 'trustmygadget.db');
+    if (!fs.existsSync(targetDbPath) && fs.existsSync(sourceDbPath)) {
+      try {
+        fs.copyFileSync(sourceDbPath, targetDbPath);
+      } catch (e) {
+        console.warn('Failed to copy initial database from bundle to /tmp:', e);
+      }
+    }
+    return targetDbPath;
   }
   return path.join(process.cwd(), 'trustmygadget.db');
 };
@@ -493,7 +502,13 @@ function initTables(database: Database.Database) {
   } else {
     // Check if catalog has all updated models synced
     const modelCountRow = database.prepare('SELECT COUNT(*) as count FROM models').get() as { count: number };
-    if (modelCountRow.count < SEED_MODELS.length) {
+    let missingSeed = modelCountRow.count < SEED_MODELS.length;
+    if (!missingSeed) {
+      const existingIds = new Set((database.prepare('SELECT id FROM models').all() as { id: string }[]).map(r => r.id));
+      missingSeed = SEED_MODELS.some(m => !existingIds.has(m.id));
+    }
+
+    if (missingSeed) {
       syncCatalogSeed(database);
     } else {
       // Ensure brand logo URLs are updated to local fast SVGs
