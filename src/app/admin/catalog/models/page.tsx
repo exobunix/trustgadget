@@ -69,6 +69,11 @@ export default function AdminModelsPage() {
     setSelectedVariantId(null);
     setName('');
     setSlug('');
+    const defaultBrand = brands[0];
+    if (defaultBrand) {
+      setBrandId(defaultBrand.id);
+      setCategoryId(defaultBrand.categoryId);
+    }
     setSeries('');
     setImageUrl('');
     setReleaseYear('2024');
@@ -86,8 +91,9 @@ export default function AdminModelsPage() {
     setSelectedVariantId(targetVariantId || null);
     setName(m.name || '');
     setSlug(m.slug || '');
-    setBrandId(m.brandId || '');
-    setCategoryId(m.categoryId || '');
+    const matchedBrand = brands.find((b) => b.id === m.brandId) || brands[0];
+    setBrandId(m.brandId || matchedBrand?.id || '');
+    setCategoryId(m.categoryId || matchedBrand?.categoryId || categories[0]?.id || 'cat_smartphone');
     setSeries(m.series || '');
     setImageUrl(m.imageUrl || '');
     setReleaseYear(String(m.releaseYear || 2024));
@@ -163,6 +169,7 @@ export default function AdminModelsPage() {
 
     try {
       const selectedBrand = brands.find((b) => b.id === brandId);
+      const effectiveCategoryId = selectedBrand?.categoryId || categoryId || categories[0]?.id || 'cat_smartphone';
       const parsedBasePrice = Number(basePrice) || 0;
 
       // Ensure every variant has a positive valid basePrice
@@ -177,7 +184,7 @@ export default function AdminModelsPage() {
         name,
         slug: slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         brandId,
-        categoryId: selectedBrand?.categoryId || categoryId,
+        categoryId: effectiveCategoryId,
         series,
         imageUrl,
         releaseYear: Number(releaseYear),
@@ -570,7 +577,14 @@ export default function AdminModelsPage() {
                 <label className="block text-slate-300 font-semibold mb-1">Manufacturer Brand *</label>
                 <select
                   value={brandId}
-                  onChange={(e) => setBrandId(e.target.value)}
+                  onChange={(e) => {
+                    const newBrandId = e.target.value;
+                    setBrandId(newBrandId);
+                    const b = brands.find((brand) => brand.id === newBrandId);
+                    if (b?.categoryId) {
+                      setCategoryId(b.categoryId);
+                    }
+                  }}
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-semibold"
                 >
                   {brands.map((b) => (
