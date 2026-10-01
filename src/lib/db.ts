@@ -16,6 +16,12 @@ import {
 
 import fs from 'fs';
 
+// Track whether MongoDB → SQLite sync has already been kicked off this cold start
+declare global {
+  // eslint-disable-next-line no-var
+  var __mongoSyncStarted: boolean | undefined;
+}
+
 const getDbPath = () => {
   if (process.env.DATABASE_PATH) return process.env.DATABASE_PATH;
   if (process.env.VERCEL || process.env.AWS_REGION) {
@@ -62,6 +68,23 @@ function getDatabase(): Database.Database {
     db.pragma('foreign_keys = ON');
     initTables(db);
     global.__dbInstance = db;
+
+    // Kick off async MongoDB → SQLite sync on every cold start
+    if (!global.__mongoSyncStarted) {
+      global.__mongoSyncStarted = true;
+      import('./mongo-catalog').then(async ({ syncMongoToSqlite, seedMongoFromSqlite }) => {
+        try {
+          // First time: seed MongoDB from SQLite seed data
+          await seedMongoFromSqlite(db);
+          // Then sync any admin changes from MongoDB → SQLite
+          await syncMongoToSqlite(db);
+        } catch (e) {
+          console.warn('[db] MongoDB sync on init failed (non-fatal):', e);
+        }
+      }).catch(() => {
+        // MongoDB unavailable – app still works with seed data
+      });
+    }
   }
   return global.__dbInstance;
 }

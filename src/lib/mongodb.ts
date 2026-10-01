@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { MongoClient } from 'mongodb';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://<db_username>:NdHS0Wqw3LVkDJS3@trustmygadget.liwngnz.mongodb.net/trustmygadget?retryWrites=true&w=majority&appName=trustmygadget';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://adarshdeepsachan_db_user:NdHS0Wqw3LVkDJS3@trustmygadget.liwngnz.mongodb.net/trustmygadget?retryWrites=true&w=majority&appName=trustmygadget';
 
 interface MongooseCache {
   conn: typeof mongoose | null;
@@ -123,7 +123,11 @@ const VariantSchema = new mongoose.Schema({
   storage: { type: String },
   processor: { type: String },
   gpu: { type: String },
+  screenSize: { type: String },
+  color: { type: String },
   basePrice: { type: Number, required: true },
+  minPrice: { type: Number },
+  maxPrice: { type: Number },
   isDefault: { type: Boolean, default: false },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });

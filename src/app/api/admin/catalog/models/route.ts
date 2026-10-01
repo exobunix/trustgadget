@@ -1,12 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, dbHelpers, flushDb } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
+import {
+  mongoGetAllModels,
+  mongoCreateModel,
+  mongoUpdateModel,
+  mongoUpdateVariant,
+  mongoUpdateAllVariantsByModel,
+  mongoUpsertVariants,
+  mongoDeleteVariant,
+  mongoDeleteModel,
+} from '@/lib/mongo-catalog';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET() {
   try {
+    // Try MongoDB first (authoritative source of truth)
+    const mongoModels = await mongoGetAllModels();
+
+    if (mongoModels && mongoModels.length > 0) {
+      // Enrich with brand/category names from SQLite (they don't change)
+      const enriched = mongoModels.map((m: any) => {
+        let brandName = m.brandName || '';
+        let categoryName = m.categoryName || '';
+        try {
+          if (!brandName) {
+            const brand = db.prepare('SELECT name FROM brands WHERE id = ?').get(m.brandId) as any;
+            brandName = brand?.name || '';
+          }
+          if (!categoryName) {
+            const cat = db.prepare('SELECT name FROM categories WHERE id = ?').get(m.categoryId) as any;
+            categoryName = cat?.name || '';
+          }
+        } catch (e) {}
+
+        return {
+          ...m,
+          brandName,
+          categoryName,
+          specifications: m.specifications || {},
+          variants: m.variants || [],
+        };
+      });
+
+      return NextResponse.json(
+        { success: true, data: enriched },
+        { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+      );
+    }
+
+    // Fallback to SQLite if MongoDB is empty or unavailable
     const models = db.prepare(`
       SELECT m.*, b.name as brandName, c.name as categoryName 
       FROM models m
@@ -106,6 +151,9 @@ export async function POST(request: NextRequest) {
       checkModel = db.prepare('SELECT id FROM models WHERE brandId = ? AND slug = ?').get(finalBrandId, modelSlug);
     }
 
+    // Build variant records for MongoDB persistence
+    const mongoVariantRecords: any[] = [];
+
     const transaction = db.transaction(() => {
       db.prepare(`
         INSERT INTO models (
@@ -172,24 +220,78 @@ export async function POST(request: NextRequest) {
             Math.round(varPrice * 1.25),
             idx === 0 ? 1 : 0
           );
+
+          mongoVariantRecords.push({
+            id: varId,
+            modelId,
+            name: variantName,
+            slug: uniqueSlug,
+            ram: v.ram || null,
+            storage: v.storage || null,
+            processor: v.processor || null,
+            gpu: v.gpu || null,
+            basePrice: varPrice,
+            minPrice: Math.round(varPrice * 0.7),
+            maxPrice: Math.round(varPrice * 1.25),
+            isDefault: idx === 0,
+            isActive: true,
+          });
         });
       } else {
         // Create default variant
+        const defVarId = `v_${Date.now()}_default`;
+        const defPrice = Number(basePrice);
         db.prepare(`
           INSERT OR REPLACE INTO variants (id, modelId, name, slug, basePrice, minPrice, maxPrice, isDefault, isActive)
           VALUES (?, ?, 'Standard Variant', 'standard', ?, ?, ?, 1, 1)
         `).run(
-          `v_${Date.now()}_default`,
+          defVarId,
           modelId,
-          Number(basePrice),
-          Math.round(Number(basePrice) * 0.7),
-          Math.round(Number(basePrice) * 1.25)
+          defPrice,
+          Math.round(defPrice * 0.7),
+          Math.round(defPrice * 1.25)
         );
+        mongoVariantRecords.push({
+          id: defVarId,
+          modelId,
+          name: 'Standard Variant',
+          slug: 'standard',
+          basePrice: defPrice,
+          minPrice: Math.round(defPrice * 0.7),
+          maxPrice: Math.round(defPrice * 1.25),
+          isDefault: true,
+          isActive: true,
+        });
       }
     });
 
     transaction();
     flushDb();
+
+    // ═══ PERSIST TO MONGODB (source of truth) ═══
+    const mongoModelData = {
+      id: modelId,
+      brandId: finalBrandId,
+      categoryId: finalCategoryId,
+      name,
+      slug: modelSlug,
+      series: series || null,
+      imageUrl: imageUrl || null,
+      releaseYear: releaseYear || new Date().getFullYear(),
+      basePrice: Number(basePrice),
+      minPrice: minPrice ? Number(minPrice) : Math.round(Number(basePrice) * 0.7),
+      maxPrice: maxPrice ? Number(maxPrice) : Math.round(Number(basePrice) * 1.25),
+      isPopular: !!isPopular,
+      isFeatured: !!isFeatured,
+      isActive: true,
+      specifications: specifications || {},
+    };
+    // Fire-and-forget but await to ensure it persists
+    try {
+      await mongoCreateModel(mongoModelData, mongoVariantRecords);
+    } catch (e) {
+      console.warn('[models/POST] MongoDB persist failed (data saved to SQLite):', e);
+    }
 
     try {
       revalidatePath('/admin/catalog/models');
@@ -292,6 +394,9 @@ export async function PATCH(request: NextRequest) {
     const modelSlug = slug
       ? slug.toLowerCase()
       : (name ? name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : (existingModel?.slug || id));
+
+    // Track variant records for MongoDB persistence
+    const mongoVariantRecords: any[] = [];
 
     const transaction = db.transaction(() => {
       if (!existingModel) {
@@ -428,14 +533,15 @@ export async function PATCH(request: NextRequest) {
             }
           }
 
+          let finalVarId: string;
           if (!updated) {
-            const varId = (isRealId && v.id) ? v.id : `v_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`;
-            retainedIds.push(varId);
+            finalVarId = (isRealId && v.id) ? v.id : `v_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`;
+            retainedIds.push(finalVarId);
             db.prepare(`
               INSERT OR REPLACE INTO variants (id, modelId, name, slug, ram, storage, basePrice, minPrice, maxPrice, isDefault, isActive)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
             `).run(
-              varId,
+              finalVarId,
               id,
               variantName,
               uniqueSlug,
@@ -446,7 +552,25 @@ export async function PATCH(request: NextRequest) {
               Math.round(varPrice * 1.25),
               idx === 0 ? 1 : 0
             );
+          } else {
+            finalVarId = v.id;
           }
+
+          mongoVariantRecords.push({
+            id: finalVarId,
+            modelId: id,
+            name: variantName,
+            slug: uniqueSlug,
+            ram: v.ram || null,
+            storage: v.storage || null,
+            processor: v.processor || null,
+            gpu: v.gpu || null,
+            basePrice: varPrice,
+            minPrice: Math.round(varPrice * 0.7),
+            maxPrice: Math.round(varPrice * 1.25),
+            isDefault: idx === 0,
+            isActive: true,
+          });
         });
 
         // Ensure models.basePrice matches the lowest or default variant if variants were updated
@@ -486,6 +610,84 @@ export async function PATCH(request: NextRequest) {
     transaction();
 
     flushDb();
+
+    // ═══ PERSIST TO MONGODB (source of truth) ═══
+    try {
+      // Update the model document
+      const mongoModelUpdate: any = {
+        brandId: finalBrandId,
+        categoryId: finalCategoryId,
+        name: name || existingModel?.name || 'Device Model',
+        slug: modelSlug,
+        series: series || existingModel?.series || null,
+        imageUrl: imageUrl || existingModel?.imageUrl || null,
+        releaseYear: releaseYear ? Number(releaseYear) : (existingModel?.releaseYear || new Date().getFullYear()),
+        isActive: isActive !== undefined ? !!isActive : (existingModel?.isActive !== 0),
+      };
+      if (parsedBasePrice) {
+        mongoModelUpdate.basePrice = parsedBasePrice;
+        mongoModelUpdate.minPrice = Math.round(parsedBasePrice * 0.7);
+        mongoModelUpdate.maxPrice = Math.round(parsedBasePrice * 1.25);
+      }
+      if (isPopular !== undefined) mongoModelUpdate.isPopular = !!isPopular;
+      if (isFeatured !== undefined) mongoModelUpdate.isFeatured = !!isFeatured;
+
+      await mongoUpdateModel(id, mongoModelUpdate);
+
+      // 1. Direct single variant price update
+      if (variantId && variantPrice !== undefined) {
+        const vNum = Number(variantPrice);
+        if (!isNaN(vNum) && vNum > 0) {
+          await mongoUpdateVariant(variantId, id, {
+            basePrice: vNum,
+            minPrice: Math.round(vNum * 0.7),
+            maxPrice: Math.round(vNum * 1.25),
+          });
+        }
+      }
+
+      // 2. Sync base price to all variants
+      if (updateAllVariants && parsedBasePrice) {
+        await mongoUpdateAllVariantsByModel(id, {
+          basePrice: parsedBasePrice,
+          minPrice: Math.round(parsedBasePrice * 0.7),
+          maxPrice: Math.round(parsedBasePrice * 1.25),
+        });
+      }
+
+      // 3. Upsert variants array
+      if (mongoVariantRecords.length > 0) {
+        await mongoUpsertVariants(id, mongoVariantRecords, !!replaceVariants);
+
+        // Sync model basePrice from default variant
+        const defaultVar = mongoVariantRecords.find(v => v.isDefault) || mongoVariantRecords[0];
+        if (defaultVar) {
+          await mongoUpdateModel(id, {
+            basePrice: defaultVar.basePrice,
+            minPrice: Math.round(defaultVar.basePrice * 0.7),
+            maxPrice: Math.round(defaultVar.basePrice * 1.25),
+          });
+        }
+      } else if (parsedBasePrice && !variantId && !updateAllVariants) {
+        // Default variant price sync in MongoDB too
+        const { MongoVariant } = await import('@/lib/mongodb');
+        const { connectToDatabase } = await import('@/lib/mongodb');
+        await connectToDatabase();
+        await MongoVariant.updateMany(
+          { modelId: id, isDefault: true },
+          {
+            $set: {
+              basePrice: parsedBasePrice,
+              minPrice: Math.round(parsedBasePrice * 0.7),
+              maxPrice: Math.round(parsedBasePrice * 1.25),
+              updatedAt: new Date(),
+            },
+          }
+        );
+      }
+    } catch (e) {
+      console.warn('[models/PATCH] MongoDB persist failed (data saved to SQLite):', e);
+    }
 
     try {
       revalidatePath('/admin/catalog/models');
@@ -532,6 +734,13 @@ export async function DELETE(request: NextRequest) {
       db.prepare('DELETE FROM variants WHERE id = ?').run(variantId);
       flushDb();
 
+      // ═══ PERSIST TO MONGODB ═══
+      try {
+        await mongoDeleteVariant(variantId);
+      } catch (e) {
+        console.warn('[models/DELETE] MongoDB variant delete failed:', e);
+      }
+
       try {
         revalidatePath('/admin/catalog/models');
         revalidatePath('/sell');
@@ -555,6 +764,13 @@ export async function DELETE(request: NextRequest) {
       db.prepare('DELETE FROM variants WHERE modelId = ?').run(id);
       db.prepare('DELETE FROM models WHERE id = ?').run(id);
       flushDb();
+
+      // ═══ PERSIST TO MONGODB ═══
+      try {
+        await mongoDeleteModel(id);
+      } catch (e) {
+        console.warn('[models/DELETE] MongoDB model delete failed:', e);
+      }
 
       try {
         revalidatePath('/admin/catalog/models');
