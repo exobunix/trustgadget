@@ -88,7 +88,7 @@ export default function HomePage() {
       try {
         const [banRes, modRes, testRes, faqRes, blogRes] = await Promise.all([
           fetch('/api/cms/banners').then((r) => r.json()),
-          fetch('/api/catalog/models?popular=true&limit=8').then((r) => r.json()),
+          fetch(`/api/catalog/models?popular=true&limit=8&_t=${Date.now()}`, { cache: 'no-store' }).then((r) => r.json()),
           fetch('/api/cms/testimonials').then((r) => r.json()),
           fetch('/api/cms/faqs').then((r) => r.json()),
           fetch('/api/cms/blogs?limit=3').then((r) => r.json()),

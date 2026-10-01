@@ -18,7 +18,7 @@ export default function BrandModelsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/catalog/models?brandSlug=${brandSlug}`);
+        const res = await fetch(`/api/catalog/models?brandSlug=${brandSlug}&_t=${Date.now()}`, { cache: 'no-store' });
         const data = await res.json();
         if (data.success) {
           setModels(data.data);

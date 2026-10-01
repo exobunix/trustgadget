@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, dbHelpers } from '@/lib/db';
+import { db, dbHelpers, flushDb } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
@@ -189,6 +189,13 @@ export async function POST(request: NextRequest) {
     });
 
     transaction();
+    flushDb();
+
+    try {
+      revalidatePath('/admin/catalog/models');
+      revalidatePath('/sell');
+      revalidatePath('/');
+    } catch (e) {}
 
     dbHelpers.createAuditLog({
       adminName: adminName || 'Admin User',
@@ -442,6 +449,18 @@ export async function PATCH(request: NextRequest) {
           }
         });
 
+        // Ensure models.basePrice matches the lowest or default variant if variants were updated
+        const baseVariant = (db.prepare('SELECT basePrice FROM variants WHERE modelId = ? AND isDefault = 1 LIMIT 1').get(id) as any)
+          || (db.prepare('SELECT MIN(basePrice) as basePrice FROM variants WHERE modelId = ?').get(id) as any);
+        if (baseVariant && baseVariant.basePrice > 0) {
+          const bp = Number(baseVariant.basePrice);
+          db.prepare(`
+            UPDATE models
+            SET basePrice = ?, minPrice = ?, maxPrice = ?, updatedAt = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(bp, Math.round(bp * 0.7), Math.round(bp * 1.25), id);
+        }
+
         // Only prune unmentioned variants when explicitly specified
         if (replaceVariants && retainedIds.length > 0) {
           const placeholders = retainedIds.map(() => '?').join(',');
@@ -466,9 +485,14 @@ export async function PATCH(request: NextRequest) {
 
     transaction();
 
+    flushDb();
+
     try {
       revalidatePath('/admin/catalog/models');
       revalidatePath('/sell');
+      revalidatePath('/sell/[category]', 'page');
+      revalidatePath('/sell/[category]/[brand]', 'page');
+      revalidatePath('/sell/[category]/[brand]/[model]', 'page');
       revalidatePath('/');
     } catch (e) {}
 
@@ -506,6 +530,7 @@ export async function DELETE(request: NextRequest) {
       } catch (e) {}
 
       db.prepare('DELETE FROM variants WHERE id = ?').run(variantId);
+      flushDb();
 
       try {
         revalidatePath('/admin/catalog/models');
@@ -529,6 +554,7 @@ export async function DELETE(request: NextRequest) {
 
       db.prepare('DELETE FROM variants WHERE modelId = ?').run(id);
       db.prepare('DELETE FROM models WHERE id = ?').run(id);
+      flushDb();
 
       try {
         revalidatePath('/admin/catalog/models');

@@ -49,9 +49,15 @@ function getDatabase(): Database.Database {
   if (!global.__dbInstance) {
     const db = new Database(dbPath);
     try {
-      db.pragma('journal_mode = WAL');
+      if (process.env.VERCEL || process.env.AWS_REGION) {
+        db.pragma('journal_mode = DELETE');
+        db.pragma('synchronous = FULL');
+      } else {
+        db.pragma('journal_mode = DELETE');
+        db.pragma('synchronous = NORMAL');
+      }
     } catch (e) {
-      db.pragma('journal_mode = DELETE');
+      try { db.pragma('journal_mode = DELETE'); } catch (_) {}
     }
     db.pragma('foreign_keys = ON');
     initTables(db);
@@ -61,6 +67,12 @@ function getDatabase(): Database.Database {
 }
 
 export const db = getDatabase();
+
+export function flushDb() {
+  try {
+    global.__dbInstance?.pragma('wal_checkpoint(TRUNCATE)');
+  } catch (e) {}
+}
 
 function initTables(database: Database.Database) {
   // Schema DDL execution

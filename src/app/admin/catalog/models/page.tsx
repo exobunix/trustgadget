@@ -151,15 +151,17 @@ export default function AdminModelsPage() {
     setBasePrice(newVal);
     const num = Number(newVal);
     if (!isNaN(num) && num > 0) {
-      setVariantsList((prev) =>
-        prev.map((v, idx) => {
-          // If single variant or if this variant was explicitly targeted, or if all variants had same price, or first variant:
-          if (prev.length === 1 || v.id === selectedVariantId || idx === 0) {
-            return { ...v, basePrice: num };
-          }
-          return v;
-        })
-      );
+      setVariantsList((prev) => {
+        if (selectedVariantId) {
+          return prev.map((v) => (v.id === selectedVariantId ? { ...v, basePrice: num } : v));
+        }
+        // If all variants had same price, or single variant, or editing model base quote:
+        const allSame = prev.length <= 1 || prev.every((v) => Number(v.basePrice) === Number(prev[0].basePrice));
+        if (allSame) {
+          return prev.map((v) => ({ ...v, basePrice: num }));
+        }
+        return prev.map((v, idx) => (idx === 0 ? { ...v, basePrice: num } : v));
+      });
     }
   };
 
@@ -167,6 +169,7 @@ export default function AdminModelsPage() {
     const num = Number(basePrice) || 0;
     if (num > 0) {
       setVariantsList((prev) => prev.map((v) => ({ ...v, basePrice: num })));
+      showToast(`✓ Base price ₹${num.toLocaleString('en-IN')} applied to all variants!`);
     }
   };
 
@@ -231,6 +234,10 @@ export default function AdminModelsPage() {
         };
       });
 
+      const effectivePrice = parsedBasePrice > 0
+        ? parsedBasePrice
+        : (normalizedVariants[0]?.basePrice || 45000);
+
       const payload = {
         name,
         slug: slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
@@ -239,11 +246,14 @@ export default function AdminModelsPage() {
         series,
         imageUrl,
         releaseYear: Number(releaseYear),
-        basePrice: parsedBasePrice,
+        basePrice: effectivePrice,
         isPopular,
         variants: normalizedVariants,
         adminName: 'Super Admin',
       };
+
+      const brandObj = brands.find((b) => b.id === brandId);
+      const catObj = categories.find((c) => c.id === effectiveCategoryId);
 
       if (editingModel) {
         const res = await fetch('/api/admin/catalog/models', {
@@ -253,9 +263,34 @@ export default function AdminModelsPage() {
         });
         const data = await res.json();
         if (!data.success) {
-          alert('Failed to update model: ' + (data.error || 'Server error'));
+          showToast('Failed to update model: ' + (data.error || 'Server error'), 'error');
           return;
         }
+
+        // Optimistically update local models state immediately so UI NEVER reverts or lags
+        setModels((prev) =>
+          prev.map((m) => {
+            if (m.id === editingModel.id) {
+              return {
+                ...m,
+                name,
+                slug: payload.slug,
+                brandId,
+                brandName: brandObj ? brandObj.name : m.brandName,
+                categoryId: effectiveCategoryId,
+                categoryName: catObj ? catObj.name : m.categoryName,
+                series,
+                imageUrl,
+                releaseYear: Number(releaseYear),
+                basePrice: effectivePrice,
+                isPopular: isPopular ? 1 : 0,
+                variants: normalizedVariants,
+              };
+            }
+            return m;
+          })
+        );
+        showToast(`✓ "${name}" updated successfully!`);
       } else {
         const res = await fetch('/api/admin/catalog/models', {
           method: 'POST',
@@ -264,16 +299,37 @@ export default function AdminModelsPage() {
         });
         const data = await res.json();
         if (!data.success) {
-          alert('Failed to create model: ' + (data.error || 'Server error'));
+          showToast('Failed to create model: ' + (data.error || 'Server error'), 'error');
           return;
         }
+
+        const newId = data.data?.id || `m_${Date.now()}`;
+        setModels((prev) => [
+          {
+            id: newId,
+            name,
+            slug: payload.slug,
+            brandId,
+            brandName: brandObj ? brandObj.name : '',
+            categoryId: effectiveCategoryId,
+            categoryName: catObj ? catObj.name : '',
+            series,
+            imageUrl,
+            releaseYear: Number(releaseYear),
+            basePrice: effectivePrice,
+            isPopular: isPopular ? 1 : 0,
+            variants: normalizedVariants,
+          },
+          ...prev,
+        ]);
+        showToast(`✓ "${name}" created successfully!`);
       }
 
       setShowModal(false);
-      await fetchModels();
+      fetchModels();
     } catch (e: any) {
       console.error(e);
-      alert('Error updating model: ' + e.message);
+      showToast('Error updating model: ' + e.message, 'error');
     } finally {
       setSubmitting(false);
     }
@@ -304,18 +360,37 @@ export default function AdminModelsPage() {
     setShowQuickModal(true);
   };
 
+  const handleQuickBasePriceChange = (val: string) => {
+    setQuickBasePrice(val);
+    const num = Number(val);
+    if (!isNaN(num) && num > 0) {
+      setQuickVariants((prev) => {
+        if (quickTargetVariantId) {
+          return prev.map((v) => (v.id === quickTargetVariantId ? { ...v, basePrice: num } : v));
+        }
+        const allSame = prev.length <= 1 || prev.every((v) => Number(v.basePrice) === Number(prev[0].basePrice));
+        if (allSame) {
+          return prev.map((v) => ({ ...v, basePrice: num }));
+        }
+        return prev.map((v, idx) => (idx === 0 ? { ...v, basePrice: num } : v));
+      });
+    }
+  };
+
   const handleQuickPriceAdjust = (delta: number) => {
     const current = Number(quickBasePrice) || 0;
     const updated = Math.max(100, current + delta);
     setQuickBasePrice(String(updated));
-    setQuickVariants((prev) =>
-      prev.map((v, idx) => {
-        if (quickTargetVariantId ? v.id === quickTargetVariantId : (prev.length === 1 || idx === 0)) {
-          return { ...v, basePrice: updated };
-        }
-        return v;
-      })
-    );
+    setQuickVariants((prev) => {
+      if (quickTargetVariantId) {
+        return prev.map((v) => (v.id === quickTargetVariantId ? { ...v, basePrice: updated } : v));
+      }
+      const allSame = prev.length <= 1 || prev.every((v) => Number(v.basePrice) === Number(prev[0].basePrice));
+      if (allSame) {
+        return prev.map((v) => ({ ...v, basePrice: updated }));
+      }
+      return prev.map((v, idx) => (idx === 0 ? { ...v, basePrice: updated } : v));
+    });
   };
 
   const handleSyncQuickPriceToAll = () => {
@@ -989,10 +1064,10 @@ export default function AdminModelsPage() {
                   <button
                     type="button"
                     onClick={applyBasePriceToAllVariants}
-                    className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold underline cursor-pointer"
+                    className="px-2 py-0.5 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/40 text-[10px] font-bold cursor-pointer transition-colors"
                     title="Apply this base price to all RAM/Storage variants below"
                   >
-                    Sync to all variants
+                    ⚡ Sync to all variants
                   </button>
                 </div>
                 <input
@@ -1306,7 +1381,7 @@ export default function AdminModelsPage() {
                     type="number"
                     required
                     value={quickBasePrice}
-                    onChange={(e) => setQuickBasePrice(e.target.value)}
+                    onChange={(e) => handleQuickBasePriceChange(e.target.value)}
                     className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-slate-900 border border-emerald-500/50 text-emerald-400 font-extrabold text-xl font-mono focus:outline-none focus:border-cyan-400"
                     placeholder="Enter price in ₹"
                   />
@@ -1369,6 +1444,9 @@ export default function AdminModelsPage() {
                                 basePrice: isNaN(newP) ? 0 : newP,
                               };
                               setQuickVariants(updated);
+                              if (idx === 0 || v.id === quickTargetVariantId || quickVariants.length === 1) {
+                                setQuickBasePrice(String(newP || ''));
+                              }
                             }}
                             className="w-full pl-6 pr-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-xs font-bold focus:outline-none focus:border-cyan-400"
                           />
