@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { FileCode, Plus, Search, Smartphone, Laptop, Edit, Trash2, Upload, ExternalLink, Download } from 'lucide-react';
+import { FileCode, Plus, Search, Smartphone, Laptop, Edit, Trash2, Upload, ExternalLink, Download, Zap, ChevronDown, ChevronRight, Check, Sparkles } from 'lucide-react';
 
 export default function AdminModelsPage() {
   const [models, setModels] = useState<any[]>([]);
@@ -12,6 +12,39 @@ export default function AdminModelsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingModel, setEditingModel] = useState<any>(null);
   const [search, setSearch] = useState('');
+
+  // Quick Edit State
+  const [showQuickModal, setShowQuickModal] = useState(false);
+  const [quickModel, setQuickModel] = useState<any>(null);
+  const [quickTargetVariantId, setQuickTargetVariantId] = useState<string | null>(null);
+  const [quickName, setQuickName] = useState('');
+  const [quickBrandId, setQuickBrandId] = useState('');
+  const [quickCategoryId, setQuickCategoryId] = useState('');
+  const [quickReleaseYear, setQuickReleaseYear] = useState('2024');
+  const [quickBasePrice, setQuickBasePrice] = useState('0');
+  const [quickIsPopular, setQuickIsPopular] = useState(false);
+  const [quickIsFeatured, setQuickIsFeatured] = useState(false);
+  const [quickIsActive, setQuickIsActive] = useState(true);
+  const [quickVariants, setQuickVariants] = useState<any[]>([]);
+  const [quickSubmitting, setQuickSubmitting] = useState(false);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [expandedModelIds, setExpandedModelIds] = useState<Set<string>>(new Set());
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => {
+      setNotification((curr) => (curr?.message === message ? null : curr));
+    }, 4000);
+  };
+
+  const toggleModelExpand = (id: string) => {
+    setExpandedModelIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Form State
   const [name, setName] = useState('');
@@ -246,17 +279,154 @@ export default function AdminModelsPage() {
     }
   };
 
+  const openQuickEdit = (m: any, targetVariantId?: string) => {
+    setQuickModel(m);
+    setQuickTargetVariantId(targetVariantId || null);
+    setQuickName(m.name || '');
+    setQuickBrandId(m.brandId || brands[0]?.id || '');
+    setQuickCategoryId(m.categoryId || categories[0]?.id || 'cat_smartphone');
+    setQuickReleaseYear(String(m.releaseYear || 2024));
+    setQuickIsPopular(m.isPopular === 1);
+    setQuickIsFeatured(m.isFeatured === 1);
+    setQuickIsActive(m.isActive !== 0);
+
+    const targetVar = targetVariantId ? m.variants?.find((v: any) => v.id === targetVariantId) : null;
+    const initialPrice = targetVar ? targetVar.basePrice : (m.basePrice || 0);
+    setQuickBasePrice(String(initialPrice));
+
+    const initialVars = (m.variants && m.variants.length > 0)
+      ? m.variants.map((v: any) => ({
+          ...v,
+          basePrice: v.basePrice !== undefined && v.basePrice !== null ? Number(v.basePrice) : Number(m.basePrice || 0),
+        }))
+      : [{ id: `${m.id}_def`, name: 'Standard', storage: 'Standard', ram: '', basePrice: Number(m.basePrice || 0) }];
+    setQuickVariants(initialVars);
+    setShowQuickModal(true);
+  };
+
+  const handleQuickPriceAdjust = (delta: number) => {
+    const current = Number(quickBasePrice) || 0;
+    const updated = Math.max(100, current + delta);
+    setQuickBasePrice(String(updated));
+    setQuickVariants((prev) =>
+      prev.map((v, idx) => {
+        if (quickTargetVariantId ? v.id === quickTargetVariantId : (prev.length === 1 || idx === 0)) {
+          return { ...v, basePrice: updated };
+        }
+        return v;
+      })
+    );
+  };
+
+  const handleSyncQuickPriceToAll = () => {
+    const p = Number(quickBasePrice) || 0;
+    if (p > 0) {
+      setQuickVariants((prev) => prev.map((v) => ({ ...v, basePrice: p })));
+      showToast('✓ Base price applied to all variants below');
+    }
+  };
+
+  const handleQuickSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!quickModel || !quickBasePrice) return;
+    setQuickSubmitting(true);
+
+    try {
+      const numBasePrice = Number(quickBasePrice) || 0;
+      const normalizedVariants = quickVariants.map((v) => ({
+        ...v,
+        basePrice: Number(v.basePrice) || numBasePrice,
+      }));
+
+      const payload = {
+        id: quickModel.id,
+        name: quickName.trim(),
+        brandId: quickBrandId,
+        categoryId: quickCategoryId,
+        releaseYear: Number(quickReleaseYear) || 2024,
+        basePrice: numBasePrice,
+        isPopular: quickIsPopular,
+        isFeatured: quickIsFeatured,
+        isActive: quickIsActive,
+        variants: normalizedVariants,
+        adminName: 'Super Admin',
+      };
+
+      const res = await fetch('/api/admin/catalog/models', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        showToast(data.error || 'Failed to update model', 'error');
+        return;
+      }
+
+      // Optimistic update of local models state
+      const brandObj = brands.find((b) => b.id === quickBrandId);
+      setModels((prev) =>
+        prev.map((m) => {
+          if (m.id === quickModel.id) {
+            return {
+              ...m,
+              name: quickName.trim(),
+              brandId: quickBrandId,
+              brandName: brandObj ? brandObj.name : m.brandName,
+              releaseYear: Number(quickReleaseYear) || 2024,
+              basePrice: numBasePrice,
+              isPopular: quickIsPopular ? 1 : 0,
+              isFeatured: quickIsFeatured ? 1 : 0,
+              isActive: quickIsActive ? 1 : 0,
+              variants: normalizedVariants,
+            };
+          }
+          return m;
+        })
+      );
+
+      setShowQuickModal(false);
+      showToast(`✓ Price & details updated for ${quickName}!`);
+      fetchModels();
+    } catch (err: any) {
+      showToast(err.message || 'Error updating model', 'error');
+    } finally {
+      setQuickSubmitting(false);
+    }
+  };
+
+  const handleDeleteVariant = async (variantId: string, variantName: string, modelName: string) => {
+    if (!confirm(`Are you sure you want to delete the "${variantName}" variant of ${modelName}?\n\nThis will remove ONLY this variant configuration. The base model and all other variants will remain safe.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/admin/catalog/models?variantId=${variantId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`✓ Variant "${variantName}" deleted.`);
+        fetchModels();
+      } else {
+        showToast(data.error || 'Failed to delete variant', 'error');
+      }
+    } catch (e: any) {
+      showToast(e.message || 'Error deleting variant', 'error');
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this device model and all its variants?')) return;
     try {
       await fetch(`/api/admin/catalog/models?id=${id}`, { method: 'DELETE' });
+      showToast('✓ Device model deleted.');
       fetchModels();
     } catch (e) {
       console.error(e);
     }
   };
 
-  const [viewMode, setViewMode] = useState<'variants' | 'models'>('variants');
+  const [viewMode, setViewMode] = useState<'models' | 'variants'>('models');
 
   // Flatten all variants so admin can inspect all 550+ models & variants
   const allVariants = React.useMemo(() => {
@@ -358,6 +528,32 @@ export default function AdminModelsPage() {
         </div>
       </div>
 
+      {/* Notification Toast */}
+      {notification && (
+        <div
+          className={`p-3.5 rounded-2xl flex items-center justify-between text-xs font-semibold shadow-lg transition-all ${
+            notification.type === 'error'
+              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {notification.type === 'error' ? (
+              <span className="w-2 h-2 rounded-full bg-rose-400" />
+            ) : (
+              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+            )}
+            <span>{notification.message}</span>
+          </div>
+          <button
+            onClick={() => setNotification(null)}
+            className="text-slate-400 hover:text-white text-xs px-2 py-0.5 rounded cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Stats Summary Strip (Highlighting >500 Devices in Database) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 glass-panel">
@@ -368,7 +564,7 @@ export default function AdminModelsPage() {
             {allVariants.length} Devices
           </div>
           <div className="text-[10px] text-emerald-400 mt-0.5">
-            ✓ Complete database inventory (&gt;500 models active)
+            ✓ Complete database inventory active
           </div>
         </div>
 
@@ -402,24 +598,24 @@ export default function AdminModelsPage() {
         {/* Toggle Mode */}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setViewMode('variants')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              viewMode === 'variants'
-                ? 'bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20'
-                : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-            }`}
-          >
-            All Device Models & Variants ({allVariants.length})
-          </button>
-          <button
             onClick={() => setViewMode('models')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               viewMode === 'models'
                 ? 'bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20'
                 : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
             Base Model Series ({models.length})
+          </button>
+          <button
+            onClick={() => setViewMode('variants')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              viewMode === 'variants'
+                ? 'bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20'
+                : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            All Device Models & Variants ({allVariants.length})
           </button>
         </div>
 
@@ -440,14 +636,14 @@ export default function AdminModelsPage() {
       <div className="bg-slate-900/80 border border-slate-800 rounded-3xl overflow-hidden glass-panel">
         <div className="overflow-x-auto">
           {viewMode === 'variants' ? (
-            /* Flattened Variants View (550 Total Items) */
+            /* Flattened Variants View */
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-950/40 text-slate-400 uppercase tracking-wider">
                   <th className="py-3.5 px-4 font-semibold">Device Configuration</th>
                   <th className="py-3.5 px-4 font-semibold">Manufacturer Brand</th>
                   <th className="py-3.5 px-4 font-semibold">Storage / RAM</th>
-                  <th className="py-3.5 px-4 font-semibold">Base Price</th>
+                  <th className="py-3.5 px-4 font-semibold">Variant Buyback Price</th>
                   <th className="py-3.5 px-4 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
@@ -472,8 +668,13 @@ export default function AdminModelsPage() {
                             )}
                           </div>
                           <div>
-                            <div className="font-bold text-white">{v.modelName}</div>
-                            <div className="text-[11px] text-cyan-400 font-semibold">{v.name}</div>
+                            <div className="font-bold text-white">
+                              {v.modelName}{' '}
+                              <span className="text-cyan-400 font-semibold text-[11px]">
+                                ({v.storage || v.name})
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono">{v.name}</div>
                           </div>
                         </div>
                       </td>
@@ -491,19 +692,27 @@ export default function AdminModelsPage() {
                           ₹{Number(v.basePrice).toLocaleString('en-IN')}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right space-x-2">
+                      <td className="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
+                        <button
+                          onClick={() => openQuickEdit(v.parentModel, v.id)}
+                          className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-colors text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
+                          title="Quick Edit Price & Basic Details"
+                        >
+                          <Zap className="w-3 h-3 text-amber-400" />
+                          <span>Quick Edit</span>
+                        </button>
                         <button
                           onClick={() => openEditModal(v.parentModel, v.id)}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-400 transition-colors text-[11px] font-medium inline-flex items-center gap-1"
-                          title="Edit Model & Variants"
+                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-400 transition-colors text-[11px] font-medium inline-flex items-center gap-1 cursor-pointer"
+                          title="Full Edit Model & Variants"
                         >
                           <Edit className="w-3 h-3" />
                           <span>Edit</span>
                         </button>
                         <button
-                          onClick={() => handleDelete(v.modelId || v.parentModel?.id)}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 transition-colors text-[11px] font-medium inline-flex items-center gap-1"
-                          title="Delete Device Model"
+                          onClick={() => handleDeleteVariant(v.id, v.name || v.storage, v.modelName)}
+                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 transition-colors text-[11px] font-medium inline-flex items-center gap-1 cursor-pointer"
+                          title="Delete only this variant"
                         >
                           <Trash2 className="w-3 h-3 text-rose-400" />
                           <span>Delete</span>
@@ -515,10 +724,11 @@ export default function AdminModelsPage() {
               </tbody>
             </table>
           ) : (
-            /* Grouped Base Models View (244 Items) */
+            /* Grouped Base Models View */
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-950/40 text-slate-400 uppercase tracking-wider">
+                  <th className="py-3.5 px-3 w-8"></th>
                   <th className="py-3.5 px-4 font-semibold">Device Family</th>
                   <th className="py-3.5 px-4 font-semibold">Manufacturer Brand</th>
                   <th className="py-3.5 px-4 font-semibold">Base Buyback Price</th>
@@ -528,63 +738,174 @@ export default function AdminModelsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                {filteredModels.map((m) => (
-                  <tr key={m.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-slate-950 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center p-1">
-                          {m.imageUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={m.imageUrl} alt={m.name} className="w-full h-full object-cover rounded" />
-                          ) : (
-                            <Smartphone className="w-4 h-4 text-slate-500" />
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-bold text-white">{m.name}</div>
-                          <div className="text-[10px] text-slate-400">{m.slug}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-semibold text-cyan-400">{m.brandName}</div>
-                      <div className="text-slate-500 text-[10px]">{m.categoryName}</div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="font-mono font-extrabold text-sm text-emerald-400">
-                        ₹{m.basePrice.toLocaleString('en-IN')}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-[11px] font-mono text-cyan-300">
-                        {m.variants?.length || 1} Variant(s)
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      {m.isPopular === 1 && (
-                        <span className="text-[9px] font-bold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-500/30">
-                          POPULAR
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3.5 px-4 text-right space-x-1.5">
-                      <button
-                        onClick={() => openEditModal(m)}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-400 transition-colors"
-                        title="Edit Model"
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(m.id)}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 transition-colors"
-                        title="Delete Model"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                {filteredModels.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-500">
+                      No models matching your search query.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredModels.map((m) => (
+                    <React.Fragment key={m.id}>
+                      <tr className="hover:bg-slate-800/30 transition-colors">
+                        <td className="py-3.5 pl-3 pr-1 text-center">
+                          {m.variants && m.variants.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => toggleModelExpand(m.id)}
+                              className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                              title={expandedModelIds.has(m.id) ? 'Collapse variants' : 'Expand variants'}
+                            >
+                              {expandedModelIds.has(m.id) ? (
+                                <ChevronDown className="w-4 h-4 text-cyan-400" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4 text-slate-400" />
+                              )}
+                            </button>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-slate-950 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center p-1">
+                              {m.imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={m.imageUrl} alt={m.name} className="w-full h-full object-cover rounded" />
+                              ) : (
+                                <Smartphone className="w-4 h-4 text-slate-500" />
+                              )}
+                            </div>
+                            <div>
+                              <div className="font-bold text-white flex items-center gap-2">
+                                <span>{m.name}</span>
+                                {m.releaseYear && (
+                                  <span className="text-[10px] text-slate-500 font-mono">({m.releaseYear})</span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-slate-400">{m.slug}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-cyan-400">{m.brandName}</div>
+                          <div className="text-slate-500 text-[10px]">{m.categoryName}</div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="font-mono font-extrabold text-sm text-emerald-400">
+                            ₹{m.basePrice.toLocaleString('en-IN')}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <button
+                            type="button"
+                            onClick={() => toggleModelExpand(m.id)}
+                            className="px-2 py-0.5 rounded bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-cyan-300 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <span>{m.variants?.length || 1} Variant(s)</span>
+                            {expandedModelIds.has(m.id) ? (
+                              <ChevronDown className="w-3 h-3 text-cyan-400" />
+                            ) : (
+                              <ChevronRight className="w-3 h-3 text-slate-400" />
+                            )}
+                          </button>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-1">
+                            {m.isPopular === 1 && (
+                              <span className="text-[9px] font-bold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-500/30">
+                                POPULAR
+                              </span>
+                            )}
+                            {m.isFeatured === 1 && (
+                              <span className="text-[9px] font-bold text-amber-400 bg-amber-950 px-2 py-0.5 rounded border border-amber-500/30">
+                                FEATURED
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                          <button
+                            onClick={() => openQuickEdit(m)}
+                            className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-colors text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
+                            title="Quick Edit Price & Basic Details"
+                          >
+                            <Zap className="w-3 h-3 text-amber-400" />
+                            <span>Quick Edit</span>
+                          </button>
+                          <button
+                            onClick={() => openEditModal(m)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-400 transition-colors inline-flex items-center cursor-pointer"
+                            title="Full Edit Model"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(m.id)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 transition-colors inline-flex items-center cursor-pointer"
+                            title="Delete Model & All Variants"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+
+                      {/* Expandable Variants Sub-Table */}
+                      {expandedModelIds.has(m.id) && m.variants && m.variants.length > 0 && (
+                        <tr className="bg-slate-950/70 border-b border-slate-800">
+                          <td colSpan={7} className="p-3 pl-12 pr-4">
+                            <div className="bg-slate-900/90 rounded-2xl border border-slate-800/80 p-3.5 space-y-2.5">
+                              <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                <span className="flex items-center gap-1.5">
+                                  <span>RAM & Storage Variants ({m.variants.length})</span>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => openQuickEdit(m)}
+                                  className="text-amber-400 hover:text-amber-300 flex items-center gap-1 font-semibold normal-case cursor-pointer text-xs"
+                                >
+                                  <Zap className="w-3.5 h-3.5" />
+                                  <span>Quick Edit All Variants</span>
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                                {m.variants.map((v: any) => (
+                                  <div
+                                    key={v.id}
+                                    className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between hover:border-slate-700 transition-all"
+                                  >
+                                    <div>
+                                      <div className="text-white font-semibold text-xs">{v.name || v.storage}</div>
+                                      <div className="text-emerald-400 font-mono font-bold text-xs mt-0.5">
+                                        ₹{Number(v.basePrice).toLocaleString('en-IN')}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => openQuickEdit(m, v.id)}
+                                        className="p-1 rounded bg-slate-800 hover:bg-amber-950 text-amber-300 transition-colors cursor-pointer"
+                                        title="Quick Edit this variant"
+                                      >
+                                        <Zap className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteVariant(v.id, v.name || v.storage, m.name)}
+                                        className="p-1 rounded bg-slate-800 hover:bg-rose-950 text-rose-400 transition-colors cursor-pointer"
+                                        title="Delete this variant"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))
+                )}
               </tbody>
             </table>
           )}
@@ -599,13 +920,29 @@ export default function AdminModelsPage() {
             className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 glass-panel space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-base font-bold text-white">
-                {editingModel ? 'Edit Device Model' : 'Add New Device Model'}
-              </h3>
+              <div className="flex items-center gap-2.5">
+                <h3 className="text-base font-bold text-white">
+                  {editingModel ? 'Edit Device Model' : 'Add New Device Model'}
+                </h3>
+                {editingModel && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowModal(false);
+                      openQuickEdit(editingModel, selectedVariantId || undefined);
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-colors"
+                    title="Switch to fast Quick Edit mode"
+                  >
+                    <Zap className="w-3 h-3 text-amber-400" />
+                    <span>Quick Edit Mode</span>
+                  </button>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-white text-xs"
+                className="text-slate-400 hover:text-white text-xs cursor-pointer px-2 py-1 rounded"
               >
                 ✕ Close
               </button>
@@ -891,17 +1228,277 @@ export default function AdminModelsPage() {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold cursor-pointer hover:bg-slate-700 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-6 py-2 rounded-xl bg-cyan-400 text-slate-950 text-xs font-bold shadow-md disabled:opacity-50"
+                className="px-6 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 text-xs font-bold shadow-md disabled:opacity-50 cursor-pointer transition-colors"
               >
                 {submitting ? 'Saving...' : editingModel ? 'Update Model' : 'Publish Model'}
               </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Quick Edit Modal */}
+      {showQuickModal && quickModel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <form
+            onSubmit={handleQuickSubmit}
+            className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-7 glass-panel space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Zap className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <span>Quick Edit: {quickModel.name}</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Fast update buyback prices & basic device specifications
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQuickModal(false)}
+                className="text-slate-400 hover:text-white text-xs px-2 py-1 rounded cursor-pointer"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* Price Section */}
+            <div className="p-4 rounded-2xl bg-slate-950/80 border border-emerald-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <span>Base Buyback Price (₹)</span>
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    Primary device buyback quote used for base valuation
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSyncQuickPriceToAll}
+                  className="px-2.5 py-1 rounded-lg bg-cyan-400/20 hover:bg-cyan-400/30 text-cyan-300 border border-cyan-400/30 text-[10px] font-bold cursor-pointer transition-all"
+                  title="Copy this price to all variants below"
+                >
+                  Sync to all variants
+                </button>
+              </div>
+
+              {/* Price Input & Quick Adjust Steppers */}
+              <div className="space-y-2">
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-lg font-mono">
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    required
+                    value={quickBasePrice}
+                    onChange={(e) => setQuickBasePrice(e.target.value)}
+                    className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-slate-900 border border-emerald-500/50 text-emerald-400 font-extrabold text-xl font-mono focus:outline-none focus:border-cyan-400"
+                    placeholder="Enter price in ₹"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Quick ±:</span>
+                  {[-1000, -500, -100, 100, 500, 1000].map((step) => (
+                    <button
+                      key={step}
+                      type="button"
+                      onClick={() => handleQuickPriceAdjust(step)}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
+                        step > 0
+                          ? 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-500/30'
+                      }`}
+                    >
+                      {step > 0 ? `+₹${step.toLocaleString('en-IN')}` : `-₹${Math.abs(step).toLocaleString('en-IN')}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Individual Variant Prices (if model has variants) */}
+            {quickVariants && quickVariants.length > 0 && (
+              <div className="p-3.5 rounded-2xl bg-slate-950/50 border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+                    Variant Price Breakdown ({quickVariants.length} SKUs)
+                  </span>
+                  <span className="text-[10px] text-slate-500">Edit per storage size</span>
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {quickVariants.map((v, idx) => (
+                    <div
+                      key={v.id || idx}
+                      className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-white font-semibold text-xs truncate">
+                          {v.name || v.storage || `Variant ${idx + 1}`}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          {v.storage || ''} {v.ram ? `• ${v.ram}` : ''}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="relative w-28">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-xs">₹</span>
+                          <input
+                            type="number"
+                            value={v.basePrice ?? ''}
+                            onChange={(e) => {
+                              const updated = [...quickVariants];
+                              const newP = Number(e.target.value);
+                              updated[idx] = {
+                                ...updated[idx],
+                                basePrice: isNaN(newP) ? 0 : newP,
+                              };
+                              setQuickVariants(updated);
+                            }}
+                            className="w-full pl-6 pr-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-xs font-bold focus:outline-none focus:border-cyan-400"
+                          />
+                        </div>
+                        {quickVariants.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setQuickVariants(quickVariants.filter((_, i) => i !== idx));
+                            }}
+                            className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                            title="Remove this variant"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Basic Things */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="sm:col-span-2">
+                <label className="block text-slate-300 font-semibold mb-1">Model Name</label>
+                <input
+                  type="text"
+                  required
+                  value={quickName}
+                  onChange={(e) => setQuickName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-semibold focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Release Year</label>
+                <input
+                  type="number"
+                  value={quickReleaseYear}
+                  onChange={(e) => setQuickReleaseYear(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+
+              <div className="sm:col-span-3">
+                <label className="block text-slate-300 font-semibold mb-1">Manufacturer Brand</label>
+                <select
+                  value={quickBrandId}
+                  onChange={(e) => {
+                    const newBId = e.target.value;
+                    setQuickBrandId(newBId);
+                    const b = brands.find((br) => br.id === newBId);
+                    if (b?.categoryId) setQuickCategoryId(b.categoryId);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-semibold focus:outline-none focus:border-cyan-400"
+                >
+                  {brands.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.categoryName || 'Smartphones'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Status Checkboxes */}
+            <div className="flex items-center gap-4 pt-1 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={quickIsPopular}
+                  onChange={(e) => setQuickIsPopular(e.target.checked)}
+                  className="rounded border-slate-700 text-cyan-400 cursor-pointer"
+                />
+                <span className="text-slate-300 font-medium">Mark as Popular</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={quickIsFeatured}
+                  onChange={(e) => setQuickIsFeatured(e.target.checked)}
+                  className="rounded border-slate-700 text-amber-400 cursor-pointer"
+                />
+                <span className="text-slate-300 font-medium">Featured Flagship</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={quickIsActive}
+                  onChange={(e) => setQuickIsActive(e.target.checked)}
+                  className="rounded border-slate-700 text-emerald-400 cursor-pointer"
+                />
+                <span className="text-slate-300 font-medium">Active in Catalog</span>
+              </label>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="pt-3 flex items-center justify-between border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowQuickModal(false);
+                  openEditModal(quickModel, quickTargetVariantId || undefined);
+                }}
+                className="text-xs text-slate-400 hover:text-cyan-400 flex items-center gap-1 cursor-pointer"
+              >
+                <span>Open Full Specification Editor →</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowQuickModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={quickSubmitting}
+                  className="px-6 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-md shadow-amber-500/20 flex items-center gap-1.5 disabled:opacity-50 cursor-pointer transition-all"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>{quickSubmitting ? 'Saving...' : 'Save Quick Changes'}</span>
+                </button>
+              </div>
             </div>
           </form>
         </div>

@@ -452,6 +452,11 @@ function initTables(database: Database.Database) {
       userAgent TEXT,
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS deleted_catalog_ids (
+      id TEXT PRIMARY KEY,
+      type TEXT DEFAULT 'model',
+      deletedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   try {
@@ -497,49 +502,58 @@ function initTables(database: Database.Database) {
 
   // Check if categories already seeded
   const countRow = database.prepare('SELECT COUNT(*) as count FROM categories').get() as { count: number };
+  let seededFlag: { value: string } | undefined;
+  try {
+    seededFlag = database.prepare("SELECT value FROM settings WHERE key = 'catalog_seeded_v3'").get() as { value: string } | undefined;
+  } catch (e) {}
+
   if (countRow.count === 0) {
     seedDatabase(database);
+    try {
+      database.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('catalog_seeded_v3', '1')").run();
+    } catch (e) {}
+  } else if (!seededFlag) {
+    // Run one-time sync with INSERT OR IGNORE so existing prices are NEVER overwritten
+    syncCatalogSeed(database);
+    try {
+      database.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('catalog_seeded_v3', '1')").run();
+    } catch (e) {}
   } else {
-    // Check if catalog has all updated models synced
-    const modelCountRow = database.prepare('SELECT COUNT(*) as count FROM models').get() as { count: number };
-    let missingSeed = modelCountRow.count < SEED_MODELS.length;
-    if (!missingSeed) {
-      const existingIds = new Set((database.prepare('SELECT id FROM models').all() as { id: string }[]).map(r => r.id));
-      missingSeed = SEED_MODELS.some(m => !existingIds.has(m.id));
-    }
-
-    if (missingSeed) {
-      syncCatalogSeed(database);
-    } else {
-      // Ensure brand logo URLs are updated to local fast SVGs
-      try {
-        const updateBrandLogo = database.prepare('UPDATE brands SET logoUrl = ? WHERE id = ?');
-        for (const b of SEED_BRANDS) {
-          updateBrandLogo.run(b.logoUrl, b.id);
-        }
-      } catch (e) {}
-    }
+    // Ensure brand logo URLs are updated to local fast SVGs
+    try {
+      const updateBrandLogo = database.prepare('UPDATE brands SET logoUrl = ? WHERE id = ?');
+      for (const b of SEED_BRANDS) {
+        updateBrandLogo.run(b.logoUrl, b.id);
+      }
+    } catch (e) {}
   }
 }
 
 function syncCatalogSeed(database: Database.Database) {
+  let deletedIds = new Set<string>();
+  try {
+    const deletedRows = database.prepare('SELECT id FROM deleted_catalog_ids').all() as { id: string }[];
+    deletedIds = new Set(deletedRows.map((r) => r.id));
+  } catch (e) {}
+
   const insertBrand = database.prepare(`
-    INSERT OR REPLACE INTO brands (id, categoryId, name, slug, logoUrl, isPopular, displayOrder, isActive)
+    INSERT OR IGNORE INTO brands (id, categoryId, name, slug, logoUrl, isPopular, displayOrder, isActive)
     VALUES (@id, @categoryId, @name, @slug, @logoUrl, @isPopular, @displayOrder, 1)
   `);
 
   const insertModel = database.prepare(`
-    INSERT OR REPLACE INTO models (id, brandId, categoryId, name, slug, series, imageUrl, releaseYear, basePrice, minPrice, maxPrice, isPopular, isFeatured, isActive, specifications)
+    INSERT OR IGNORE INTO models (id, brandId, categoryId, name, slug, series, imageUrl, releaseYear, basePrice, minPrice, maxPrice, isPopular, isFeatured, isActive, specifications)
     VALUES (@id, @brandId, @categoryId, @name, @slug, @series, @imageUrl, @releaseYear, @basePrice, @minPrice, @maxPrice, @isPopular, @isFeatured, 1, @specifications)
   `);
 
   const insertVariant = database.prepare(`
-    INSERT OR REPLACE INTO variants (id, modelId, name, slug, ram, storage, processor, gpu, screenSize, color, basePrice, minPrice, maxPrice, isDefault, isActive)
+    INSERT OR IGNORE INTO variants (id, modelId, name, slug, ram, storage, processor, gpu, screenSize, color, basePrice, minPrice, maxPrice, isDefault, isActive)
     VALUES (@id, @modelId, @name, @slug, @ram, @storage, @processor, @gpu, @screenSize, @color, @basePrice, @minPrice, @maxPrice, @isDefault, 1)
   `);
 
   const transaction = database.transaction(() => {
     for (const b of SEED_BRANDS) {
+      if (deletedIds.has(b.id)) continue;
       insertBrand.run({
         id: b.id,
         categoryId: b.categoryId,
@@ -552,6 +566,7 @@ function syncCatalogSeed(database: Database.Database) {
     }
 
     for (const m of SEED_MODELS) {
+      if (deletedIds.has(m.id)) continue;
       insertModel.run({
         id: m.id,
         brandId: m.brandId,
@@ -570,6 +585,7 @@ function syncCatalogSeed(database: Database.Database) {
       });
 
       for (const v of m.variants) {
+        if (deletedIds.has(v.id)) continue;
         insertVariant.run({
           id: v.id,
           modelId: m.id,

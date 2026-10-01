@@ -80,6 +80,16 @@ export async function POST(request: NextRequest) {
       finalCategoryId = bRow?.categoryId || 'cat_smartphone';
     }
 
+    // Check if duplicate model name already exists under this brand
+    const existingByName = db.prepare('SELECT id, name FROM models WHERE brandId = ? AND LOWER(TRIM(name)) = LOWER(TRIM(?))').get(finalBrandId, name) as any;
+    if (existingByName) {
+      return NextResponse.json({
+        success: false,
+        error: `A model named "${name}" already exists for this brand. Please use Quick Edit to adjust pricing or variants on the existing model instead of creating a duplicate.`,
+        existingId: existingByName.id,
+      }, { status: 409 });
+    }
+
     const modelId = `m_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     let modelSlug = slug
       ? slug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
@@ -197,7 +207,26 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, brandId, categoryId, name, slug, series, imageUrl, releaseYear, basePrice, isPopular, variants, adminName } = body;
+    const {
+      id,
+      brandId,
+      categoryId,
+      name,
+      slug,
+      series,
+      imageUrl,
+      releaseYear,
+      basePrice,
+      isPopular,
+      isFeatured,
+      isActive,
+      variants,
+      variantId,
+      variantPrice,
+      updateAllVariants,
+      replaceVariants,
+      adminName,
+    } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'Model ID is required' }, { status: 400 });
@@ -264,7 +293,7 @@ export async function PATCH(request: NextRequest) {
           INSERT INTO models (
             id, brandId, categoryId, name, slug, series, imageUrl, releaseYear,
             basePrice, minPrice, maxPrice, isPopular, isFeatured, isActive, specifications
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, '{}')
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}')
         `).run(
           id,
           finalBrandId,
@@ -277,7 +306,9 @@ export async function PATCH(request: NextRequest) {
           parsedBasePrice || 15000,
           parsedBasePrice ? Math.round(parsedBasePrice * 0.7) : 10500,
           parsedBasePrice ? Math.round(parsedBasePrice * 1.25) : 18750,
-          isPopular ? 1 : 0
+          isPopular ? 1 : 0,
+          isFeatured ? 1 : 0,
+          isActive !== undefined ? (isActive ? 1 : 0) : 1
         );
       } else {
         db.prepare(`
@@ -293,6 +324,8 @@ export async function PATCH(request: NextRequest) {
               minPrice = COALESCE(?, minPrice),
               maxPrice = COALESCE(?, maxPrice),
               isPopular = COALESCE(?, isPopular),
+              isFeatured = COALESCE(?, isFeatured),
+              isActive = COALESCE(?, isActive),
               updatedAt = CURRENT_TIMESTAMP
           WHERE id = ?
         `).run(
@@ -307,14 +340,36 @@ export async function PATCH(request: NextRequest) {
           parsedBasePrice ? Math.round(parsedBasePrice * 0.7) : null,
           parsedBasePrice ? Math.round(parsedBasePrice * 1.25) : null,
           isPopular !== undefined ? (isPopular ? 1 : 0) : null,
+          isFeatured !== undefined ? (isFeatured ? 1 : 0) : null,
+          isActive !== undefined ? (isActive ? 1 : 0) : null,
           id
         );
       }
 
-      // If variants provided, update, insert, or delete variants
+      // 1. Direct single variant quick price update
+      if (variantId && variantPrice !== undefined) {
+        const vNum = Number(variantPrice);
+        if (!isNaN(vNum) && vNum > 0) {
+          db.prepare(`
+            UPDATE variants
+            SET basePrice = ?, minPrice = ?, maxPrice = ?, updatedAt = CURRENT_TIMESTAMP
+            WHERE id = ? AND modelId = ?
+          `).run(vNum, Math.round(vNum * 0.7), Math.round(vNum * 1.25), variantId, id);
+        }
+      }
+
+      // 2. Sync base price to all variants
+      if (updateAllVariants && parsedBasePrice) {
+        db.prepare(`
+          UPDATE variants
+          SET basePrice = ?, minPrice = ?, maxPrice = ?, updatedAt = CURRENT_TIMESTAMP
+          WHERE modelId = ?
+        `).run(parsedBasePrice, Math.round(parsedBasePrice * 0.7), Math.round(parsedBasePrice * 1.25), id);
+      }
+
+      // 3. If variants provided, update, insert, or optionally delete variants
       if (Array.isArray(variants) && variants.length > 0) {
         const retainedIds: string[] = [];
-
         const seenSlugs = new Set<string>();
 
         variants.forEach((v: any, idx: number) => {
@@ -387,7 +442,8 @@ export async function PATCH(request: NextRequest) {
           }
         });
 
-        if (retainedIds.length > 0) {
+        // Only prune unmentioned variants when explicitly specified
+        if (replaceVariants && retainedIds.length > 0) {
           const placeholders = retainedIds.map(() => '?').join(',');
           try {
             db.prepare(`DELETE FROM variants WHERE modelId = ? AND id NOT IN (${placeholders})`).run(id, ...retainedIds);
@@ -395,15 +451,15 @@ export async function PATCH(request: NextRequest) {
             // Ignore if foreign key reference prevents deletion
           }
         }
-      } else if (parsedBasePrice) {
-        // If no variants list was provided, update existing variants for this model
+      } else if (parsedBasePrice && !variantId && !updateAllVariants) {
+        // If single price update and no variants array sent, ensure default variants have matching price
         db.prepare(`
           UPDATE variants
           SET basePrice = ?,
               minPrice = ?,
               maxPrice = ?,
               updatedAt = CURRENT_TIMESTAMP
-          WHERE modelId = ?
+          WHERE modelId = ? AND isDefault = 1
         `).run(parsedBasePrice, Math.round(parsedBasePrice * 0.7), Math.round(parsedBasePrice * 1.25), id);
       }
     });
@@ -437,15 +493,53 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const variantId = searchParams.get('variantId');
 
-    if (!id) {
-      return NextResponse.json({ success: false, error: 'Model ID is required' }, { status: 400 });
+    if (!id && !variantId) {
+      return NextResponse.json({ success: false, error: 'Model ID or Variant ID is required' }, { status: 400 });
     }
 
-    db.prepare('DELETE FROM variants WHERE modelId = ?').run(id);
-    db.prepare('DELETE FROM models WHERE id = ?').run(id);
+    if (variantId) {
+      // Safely record in deleted_catalog_ids so seed never resurrects it
+      try {
+        db.prepare('INSERT OR REPLACE INTO deleted_catalog_ids (id, type) VALUES (?, ?)').run(variantId, 'variant');
+      } catch (e) {}
 
-    return NextResponse.json({ success: true, message: 'Model deleted successfully' });
+      db.prepare('DELETE FROM variants WHERE id = ?').run(variantId);
+
+      try {
+        revalidatePath('/admin/catalog/models');
+        revalidatePath('/sell');
+        revalidatePath('/');
+      } catch (e) {}
+
+      return NextResponse.json({ success: true, message: 'Variant deleted successfully' });
+    }
+
+    if (id) {
+      // Record model and its variants in deleted_catalog_ids so seed never resurrects them
+      try {
+        db.prepare('INSERT OR REPLACE INTO deleted_catalog_ids (id, type) VALUES (?, ?)').run(id, 'model');
+        const vRows = db.prepare('SELECT id FROM variants WHERE modelId = ?').all(id) as { id: string }[];
+        const insertDel = db.prepare('INSERT OR REPLACE INTO deleted_catalog_ids (id, type) VALUES (?, ?)');
+        for (const v of vRows) {
+          insertDel.run(v.id, 'variant');
+        }
+      } catch (e) {}
+
+      db.prepare('DELETE FROM variants WHERE modelId = ?').run(id);
+      db.prepare('DELETE FROM models WHERE id = ?').run(id);
+
+      try {
+        revalidatePath('/admin/catalog/models');
+        revalidatePath('/sell');
+        revalidatePath('/');
+      } catch (e) {}
+
+      return NextResponse.json({ success: true, message: 'Model deleted successfully' });
+    }
+
+    return NextResponse.json({ success: false, error: 'No ID provided' }, { status: 400 });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
