@@ -17,12 +17,37 @@ export const revalidate = 0;
 
 export async function GET() {
   try {
-    // Try MongoDB first (authoritative source of truth)
+    // 1. Fetch SQLite models as baseline
+    const sqliteModels = db.prepare(`
+      SELECT m.*, b.name as brandName, c.name as categoryName 
+      FROM models m
+      LEFT JOIN brands b ON m.brandId = b.id
+      LEFT JOIN categories c ON m.categoryId = c.id
+      ORDER BY m.createdAt DESC
+    `).all() as any[];
+
+    const getVariants = db.prepare('SELECT * FROM variants WHERE modelId = ?');
+    const sqliteEnriched = sqliteModels.map(m => {
+      let specs = {};
+      try {
+        specs = m.specifications ? (typeof m.specifications === 'string' ? JSON.parse(m.specifications) : m.specifications) : {};
+      } catch (e) {}
+      return {
+        ...m,
+        variants: getVariants.all(m.id),
+        specifications: specs,
+      };
+    });
+
+    // 2. Try MongoDB (persistent source of truth for all edits)
     const mongoModels = await mongoGetAllModels();
 
     if (mongoModels && mongoModels.length > 0) {
-      // Enrich with brand/category names from SQLite (they don't change)
-      const enriched = mongoModels.map((m: any) => {
+      const mergedList: any[] = [];
+      const seenIds = new Set<string>();
+
+      // Authoritative models from MongoDB (contains all admin edits)
+      for (const m of mongoModels) {
         let brandName = m.brandName || '';
         let categoryName = m.categoryName || '';
         try {
@@ -36,39 +61,33 @@ export async function GET() {
           }
         } catch (e) {}
 
-        return {
+        seenIds.add(m.id);
+        mergedList.push({
           ...m,
           brandName,
           categoryName,
           specifications: m.specifications || {},
           variants: m.variants || [],
-        };
-      });
+        });
+      }
+
+      // Add any SQLite models not present in MongoDB so catalog is ALWAYS complete
+      for (const sm of sqliteEnriched) {
+        if (!seenIds.has(sm.id)) {
+          seenIds.add(sm.id);
+          mergedList.push(sm);
+        }
+      }
 
       return NextResponse.json(
-        { success: true, data: enriched },
+        { success: true, data: mergedList },
         { headers: { 'Cache-Control': 'no-store, max-age=0' } }
       );
     }
 
-    // Fallback to SQLite if MongoDB is empty or unavailable
-    const models = db.prepare(`
-      SELECT m.*, b.name as brandName, c.name as categoryName 
-      FROM models m
-      JOIN brands b ON m.brandId = b.id
-      JOIN categories c ON m.categoryId = c.id
-      ORDER BY m.createdAt DESC
-    `).all() as any[];
-
-    const getVariants = db.prepare('SELECT * FROM variants WHERE modelId = ?');
-    const enriched = models.map(m => ({
-      ...m,
-      variants: getVariants.all(m.id),
-      specifications: m.specifications ? JSON.parse(m.specifications) : {},
-    }));
-
+    // Fallback if MongoDB is offline: return all SQLite models
     return NextResponse.json(
-      { success: true, data: enriched },
+      { success: true, data: sqliteEnriched },
       { headers: { 'Cache-Control': 'no-store, max-age=0' } }
     );
   } catch (error: any) {

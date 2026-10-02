@@ -1,5 +1,12 @@
 import mongoose from 'mongoose';
 import { MongoClient } from 'mongodb';
+import dns from 'dns';
+
+try {
+  if (typeof dns.setServers === 'function') {
+    dns.setServers(['8.8.8.8', '8.8.4.4']);
+  }
+} catch (e) {}
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://adarshdeepsachan_db_user:NdHS0Wqw3LVkDJS3@trustmygadget.liwngnz.mongodb.net/trustmygadget?retryWrites=true&w=majority&appName=trustmygadget';
 

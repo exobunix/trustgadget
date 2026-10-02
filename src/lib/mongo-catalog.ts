@@ -35,15 +35,21 @@ async function ensureMongo() {
 export async function mongoGetAllModels() {
   if (!(await ensureMongo())) return null;
   try {
-    const models = await MongoModel.find({}).sort({ createdAt: -1 }).lean();
-    // Attach variants
-    const enriched = await Promise.all(
-      models.map(async (m: any) => {
-        const variants = await MongoVariant.find({ modelId: m.id }).lean();
-        return { ...m, variants };
-      })
-    );
-    return enriched;
+    const [models, variants] = await Promise.all([
+      MongoModel.find({}).sort({ releaseYear: -1, basePrice: -1, createdAt: -1 }).lean(),
+      MongoVariant.find({}).lean(),
+    ]);
+
+    const variantsByModel = new Map<string, any[]>();
+    for (const v of variants) {
+      if (!variantsByModel.has(v.modelId)) variantsByModel.set(v.modelId, []);
+      variantsByModel.get(v.modelId)!.push(v);
+    }
+
+    return models.map((m: any) => ({
+      ...m,
+      variants: variantsByModel.get(m.id) || [],
+    }));
   } catch (e) {
     console.warn('[mongo-catalog] mongoGetAllModels error:', e);
     return null;
@@ -53,7 +59,10 @@ export async function mongoGetAllModels() {
 export async function mongoGetModelById(modelId: string) {
   if (!(await ensureMongo())) return null;
   try {
-    return await MongoModel.findOne({ id: modelId }).lean();
+    const model = await MongoModel.findOne({ id: modelId }).lean();
+    if (!model) return null;
+    const variants = await MongoVariant.find({ modelId }).lean();
+    return { ...model, variants };
   } catch (e) {
     console.warn('[mongo-catalog] mongoGetModelById error:', e);
     return null;
@@ -202,27 +211,33 @@ export async function mongoDeleteModel(modelId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// SYNC: MongoDB → SQLite  (run on every cold-start so public pages see data)
+// SYNC: MongoDB → SQLite  (run on cold-start so public pages have latest data)
 // ---------------------------------------------------------------------------
 
 export async function syncMongoToSqlite(sqliteDb: any) {
   if (!(await ensureMongo())) return;
 
   try {
-    const mongoModels = await MongoModel.find({}).lean() as any[];
-    const mongoVariants = await MongoVariant.find({}).lean() as any[];
+    const [mongoCategories, mongoBrands, mongoModels, mongoVariants] = await Promise.all([
+      MongoCategory.find({}).lean() as Promise<any[]>,
+      MongoBrand.find({}).lean() as Promise<any[]>,
+      MongoModel.find({}).lean() as Promise<any[]>,
+      MongoVariant.find({}).lean() as Promise<any[]>,
+    ]);
 
     if (!mongoModels.length && !mongoVariants.length) {
-      // MongoDB is empty — nothing to sync (first deploy or empty state)
       return;
     }
 
-    // Build lookup
-    const variantsByModel = new Map<string, any[]>();
-    for (const v of mongoVariants) {
-      if (!variantsByModel.has(v.modelId)) variantsByModel.set(v.modelId, []);
-      variantsByModel.get(v.modelId)!.push(v);
-    }
+    const upsertCategory = sqliteDb.prepare(`
+      INSERT OR REPLACE INTO categories (id, name, slug, icon, description, imageUrl, displayOrder, isActive)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const upsertBrand = sqliteDb.prepare(`
+      INSERT OR REPLACE INTO brands (id, categoryId, name, slug, logoUrl, isPopular, displayOrder, isActive)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
     const upsertModel = sqliteDb.prepare(`
       INSERT OR REPLACE INTO models (
@@ -237,15 +252,44 @@ export async function syncMongoToSqlite(sqliteDb: any) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
+    // Build lookup
+    const variantsByModel = new Map<string, any[]>();
+    for (const v of mongoVariants) {
+      if (!variantsByModel.has(v.modelId)) variantsByModel.set(v.modelId, []);
+      variantsByModel.get(v.modelId)!.push(v);
+    }
+
     const transaction = sqliteDb.transaction(() => {
+      // 1. Sync categories first
+      for (const c of mongoCategories) {
+        upsertCategory.run(
+          c.id,
+          c.name,
+          c.slug,
+          c.icon || 'Smartphone',
+          c.description || null,
+          c.imageUrl || null,
+          c.displayOrder || 0,
+          c.isActive !== false ? 1 : 0
+        );
+      }
+
+      // 2. Sync brands next
+      for (const b of mongoBrands) {
+        upsertBrand.run(
+          b.id,
+          b.categoryId,
+          b.name,
+          b.slug,
+          b.logoUrl || null,
+          b.isPopular ? 1 : 0,
+          b.displayOrder || 0,
+          b.isActive !== false ? 1 : 0
+        );
+      }
+
+      // 3. Sync models and variants
       for (const m of mongoModels) {
-        // Validate that the brand exists in SQLite before inserting
-        const brandExists = sqliteDb.prepare('SELECT id FROM brands WHERE id = ?').get(m.brandId);
-        if (!brandExists) continue; // skip models whose brand doesn't exist in SQLite
-
-        const categoryExists = sqliteDb.prepare('SELECT id FROM categories WHERE id = ?').get(m.categoryId);
-        if (!categoryExists) continue;
-
         upsertModel.run(
           m.id,
           m.brandId,
@@ -293,20 +337,13 @@ export async function syncMongoToSqlite(sqliteDb: any) {
 }
 
 // ---------------------------------------------------------------------------
-// INITIAL SEED: SQLite → MongoDB  (one-time: populates MongoDB from seed data)
+// SEED: SQLite → MongoDB (uses $setOnInsert so existing/edited data is NEVER overwritten)
 // ---------------------------------------------------------------------------
 
 export async function seedMongoFromSqlite(sqliteDb: any) {
   if (!(await ensureMongo())) return;
 
   try {
-    // Check if MongoDB already has models
-    const existingCount = await MongoModel.countDocuments();
-    if (existingCount > 0) {
-      // MongoDB already seeded – don't overwrite
-      return;
-    }
-
     const models = sqliteDb.prepare('SELECT * FROM models').all() as any[];
     const variants = sqliteDb.prepare('SELECT * FROM variants').all() as any[];
     const brands = sqliteDb.prepare('SELECT * FROM brands').all() as any[];
@@ -318,7 +355,7 @@ export async function seedMongoFromSqlite(sqliteDb: any) {
         updateOne: {
           filter: { id: c.id },
           update: {
-            $set: {
+            $setOnInsert: {
               id: c.id,
               name: c.name,
               slug: c.slug,
@@ -341,7 +378,7 @@ export async function seedMongoFromSqlite(sqliteDb: any) {
         updateOne: {
           filter: { id: b.id },
           update: {
-            $set: {
+            $setOnInsert: {
               id: b.id,
               categoryId: b.categoryId,
               name: b.name,
@@ -358,13 +395,13 @@ export async function seedMongoFromSqlite(sqliteDb: any) {
       await MongoBrand.bulkWrite(brandOps);
     }
 
-    // Seed models
+    // Seed models with $setOnInsert: NEVER overwrites models that already exist or were edited!
     if (models.length > 0) {
       const modelOps = models.map((m: any) => ({
         updateOne: {
           filter: { id: m.id },
           update: {
-            $set: {
+            $setOnInsert: {
               id: m.id,
               brandId: m.brandId,
               categoryId: m.categoryId,
@@ -388,13 +425,13 @@ export async function seedMongoFromSqlite(sqliteDb: any) {
       await MongoModel.bulkWrite(modelOps);
     }
 
-    // Seed variants
+    // Seed variants with $setOnInsert: NEVER overwrites variants that already exist or were edited!
     if (variants.length > 0) {
       const varOps = variants.map((v: any) => ({
         updateOne: {
           filter: { id: v.id },
           update: {
-            $set: {
+            $setOnInsert: {
               id: v.id,
               modelId: v.modelId,
               name: v.name,
@@ -403,6 +440,8 @@ export async function seedMongoFromSqlite(sqliteDb: any) {
               storage: v.storage || null,
               processor: v.processor || null,
               gpu: v.gpu || null,
+              screenSize: v.screenSize || null,
+              color: v.color || null,
               basePrice: Number(v.basePrice),
               minPrice: v.minPrice != null ? Number(v.minPrice) : Math.round(Number(v.basePrice) * 0.7),
               maxPrice: v.maxPrice != null ? Number(v.maxPrice) : Math.round(Number(v.basePrice) * 1.25),
@@ -416,7 +455,7 @@ export async function seedMongoFromSqlite(sqliteDb: any) {
       await MongoVariant.bulkWrite(varOps);
     }
 
-    console.log(`[mongo-catalog] Initial seed complete: ${models.length} models, ${variants.length} variants → MongoDB`);
+    console.log(`[mongo-catalog] Seed check complete (checked ${models.length} models, ${variants.length} variants)`);
   } catch (e) {
     console.warn('[mongo-catalog] seedMongoFromSqlite error:', e);
   }
