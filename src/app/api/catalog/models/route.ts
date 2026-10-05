@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const brandId = searchParams.get('brandId');
     const brandSlug = searchParams.get('brandSlug');
     const categoryId = searchParams.get('categoryId');
+    const categorySlug = searchParams.get('categorySlug');
     const popularOnly = searchParams.get('popular') === 'true';
     const limit = parseInt(searchParams.get('limit') || '50', 10);
 
@@ -20,10 +21,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: models }, { headers: noCacheHeaders });
     }
 
+    let resolvedCategoryId = categoryId;
+    if (!resolvedCategoryId && categorySlug) {
+      const cat = db.prepare('SELECT id FROM categories WHERE slug = ?').get(categorySlug) as any;
+      if (cat) resolvedCategoryId = cat.id;
+    }
+
     let resolvedBrandId = brandId;
     if (!resolvedBrandId && brandSlug) {
-      const brand = db.prepare('SELECT id FROM brands WHERE slug = ?').get(brandSlug) as any;
-      if (brand) resolvedBrandId = brand.id;
+      if (resolvedCategoryId) {
+        const brand = db.prepare('SELECT id FROM brands WHERE slug = ? AND categoryId = ?').get(brandSlug, resolvedCategoryId) as any;
+        if (brand) resolvedBrandId = brand.id;
+      }
+      if (!resolvedBrandId) {
+        const brand = db.prepare('SELECT id FROM brands WHERE slug = ?').get(brandSlug) as any;
+        if (brand) resolvedBrandId = brand.id;
+      }
     }
 
     if (resolvedBrandId) {

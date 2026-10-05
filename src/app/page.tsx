@@ -400,7 +400,7 @@ export default function HomePage() {
             href="/sell"
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-400 hover:text-cyan-300"
           >
-            <span>View all 60+ models</span>
+            <span>View all 2,000+ models</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>

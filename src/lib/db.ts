@@ -919,7 +919,14 @@ export const dbHelpers = {
 
   // Models
   getModelsByBrand: (brandId: string) => {
-    return db.prepare('SELECT * FROM models WHERE brandId = ? AND isActive = 1 ORDER BY releaseYear DESC, basePrice DESC').all(brandId);
+    return db.prepare(`
+      SELECT m.*, b.name as brandName, b.slug as brandSlug, c.name as categoryName, c.slug as categorySlug
+      FROM models m
+      JOIN brands b ON m.brandId = b.id
+      JOIN categories c ON m.categoryId = c.id
+      WHERE m.brandId = ? AND m.isActive = 1
+      ORDER BY m.releaseYear DESC, m.basePrice DESC
+    `).all(brandId);
   },
   getModelBySlug: (brandId: string, slug: string) => {
     return db.prepare('SELECT * FROM models WHERE brandId = ? AND slug = ?').get(brandId, slug);
