@@ -24,12 +24,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${baseUrl}/track-order`, lastModified: currentDate, changeFrequency: 'daily', priority: 0.7 },
   ];
 
-  // Category routes
+  let blogRoutes: MetadataRoute.Sitemap = [];
   let categoryRoutes: MetadataRoute.Sitemap = [];
   let brandRoutes: MetadataRoute.Sitemap = [];
   let modelRoutes: MetadataRoute.Sitemap = [];
 
   try {
+    const blogs = db.prepare('SELECT slug, updatedAt, publishedAt FROM blogs WHERE isPublished = 1').all() as any[];
+    blogRoutes = blogs.map((b) => ({
+      url: `${baseUrl}/blog/${b.slug}`,
+      lastModified: b.updatedAt || b.publishedAt ? new Date(b.updatedAt || b.publishedAt) : currentDate,
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    }));
+
     const categories = db.prepare('SELECT id, slug FROM categories WHERE isActive = 1').all() as any[];
     categoryRoutes = categories.map((c) => ({
       url: `${baseUrl}/sell/${c.slug}`,
@@ -70,5 +78,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     console.error('Failed to load dynamic sitemap catalog entries:', e);
   }
 
-  return [...staticRoutes, ...categoryRoutes, ...brandRoutes, ...modelRoutes];
+  return [...staticRoutes, ...blogRoutes, ...categoryRoutes, ...brandRoutes, ...modelRoutes];
 }
