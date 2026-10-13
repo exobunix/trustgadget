@@ -15,6 +15,7 @@ import {
 } from './seed-data';
 
 import fs from 'fs';
+import { isQuestionApplicable } from './question-targeting';
 
 // Track whether MongoDB → SQLite sync has already been kicked off this cold start
 declare global {
@@ -72,12 +73,14 @@ function getDatabase(): Database.Database {
     // Kick off async MongoDB → SQLite sync on every cold start
     if (!global.__mongoSyncStarted) {
       global.__mongoSyncStarted = true;
-      import('./mongo-catalog').then(async ({ syncMongoToSqlite, seedMongoFromSqlite }) => {
+      import('./mongo-catalog').then(async (mongo) => {
         try {
-          // First time: seed MongoDB from SQLite seed data
-          await seedMongoFromSqlite(db);
-          // Then sync any admin changes from MongoDB → SQLite
-          await syncMongoToSqlite(db);
+          await mongo.seedMongoFromSqlite(db);
+          await mongo.syncMongoToSqlite(db);
+          await mongo.seedMongoQuestionsFromSqlite(db);
+          await mongo.syncMongoQuestionsToSqlite(db);
+          await mongo.seedMongoPricingRulesFromSqlite(db);
+          await mongo.syncMongoPricingRulesToSqlite(db);
         } catch (e) {
           console.warn('[db] MongoDB sync on init failed (non-fatal):', e);
         }
@@ -499,6 +502,24 @@ function initTables(database: Database.Database) {
   } catch (e) {
     // Column already exists
   }
+
+  // Ensure targetCategory column exists on questions and pricing_rules
+  try { database.exec('ALTER TABLE questions ADD COLUMN targetCategory TEXT DEFAULT "ALL"'); } catch (e) {}
+  try { database.exec('ALTER TABLE pricing_rules ADD COLUMN targetCategory TEXT DEFAULT "ALL"'); } catch (e) {}
+
+  // Synchronize initial question target categories
+  try {
+    database.prepare(`
+      UPDATE questions 
+      SET targetCategory = 'SMARTPHONE', categoryId = 'cat_smartphone' 
+      WHERE (code LIKE 'PHONE_%') AND (targetCategory IS NULL OR targetCategory = 'ALL')
+    `).run();
+    database.prepare(`
+      UPDATE questions 
+      SET targetCategory = 'LAPTOP', categoryId = 'cat_laptop' 
+      WHERE (code LIKE 'LAPTOP_%') AND (targetCategory IS NULL OR targetCategory = 'ALL')
+    `).run();
+  } catch (e) {}
 
   // Ensure consent columns exist on orders table
   try { database.exec('ALTER TABLE orders ADD COLUMN consentGiven INTEGER DEFAULT 1'); } catch (e) {}
@@ -970,22 +991,51 @@ export const dbHelpers = {
 
   // Questions & Answers
   getQuestionsForDevice: (categoryId: string, brandId?: string, modelId?: string) => {
-    // Fetches category questions + brand specific + model specific questions
+    // 1. Fetch model context if modelId or brandId is present
+    let brandName = '';
+    let modelName = '';
+    let series = '';
+    if (modelId) {
+      try {
+        const m = db.prepare('SELECT m.name as modelName, m.series, b.name as brandName FROM models m LEFT JOIN brands b ON m.brandId = b.id WHERE m.id = ?').get(modelId) as any;
+        if (m) {
+          modelName = m.modelName || '';
+          brandName = m.brandName || '';
+          series = m.series || '';
+        }
+      } catch (e) {}
+    } else if (brandId) {
+      try {
+        const b = db.prepare('SELECT name FROM brands WHERE id = ?').get(brandId) as any;
+        if (b) brandName = b.name || '';
+      } catch (e) {}
+    }
+
+    const deviceContext = {
+      categoryId,
+      brandId,
+      brandName,
+      modelId,
+      modelName,
+      series,
+    };
+
+    // 2. Fetches active questions
     const questions = db.prepare(`
       SELECT * FROM questions 
-      WHERE (categoryId = ? OR categoryId IS NULL)
-        AND (brandId = ? OR brandId IS NULL)
-        AND (modelId = ? OR modelId IS NULL)
-        AND isActive = 1
+      WHERE isActive = 1
       ORDER BY displayOrder ASC
-    `).all(categoryId, brandId || null, modelId || null) as any[];
+    `).all() as any[];
 
-    // Attach answers to each question
+    // 3. Attach answers to each question
     const getAnswers = db.prepare('SELECT * FROM answers WHERE questionId = ? AND isActive = 1 ORDER BY displayOrder ASC');
-    return questions.map(q => ({
+    const enriched = questions.map(q => ({
       ...q,
       answers: getAnswers.all(q.id),
     }));
+
+    // 4. Centralized applicability check
+    return enriched.filter(q => isQuestionApplicable(q, deviceContext));
   },
   updateAnswer: (answerId: string, data: { adjustmentValue?: number; label?: string; description?: string }) => {
     return db.prepare(`
@@ -1253,8 +1303,14 @@ export const dbHelpers = {
     const completedValueRow = db.prepare("SELECT SUM(finalVerifiedPrice) as total FROM orders WHERE status = 'PAYMENT_COMPLETED'").get() as { total: number | null };
     
     const totalModelsRow = db.prepare('SELECT COUNT(*) as count FROM models WHERE isActive = 1').get() as { count: number };
+    const totalVariantsRow = db.prepare('SELECT COUNT(*) as count FROM variants WHERE isActive = 1').get() as { count: number };
     const totalBrandsRow = db.prepare('SELECT COUNT(*) as count FROM brands WHERE isActive = 1').get() as { count: number };
     const totalUsersRow = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
+
+    // Models that have 0 variants count as 1 base hardware configuration
+    const modelsWithVariantsRow = db.prepare('SELECT COUNT(DISTINCT modelId) as count FROM variants').get() as { count: number };
+    const modelsWithoutVariants = Math.max(0, totalModelsRow.count - (modelsWithVariantsRow?.count || 0));
+    const totalConfigurations = (totalVariantsRow?.count || 0) + modelsWithoutVariants;
 
     // Category distribution
     const categoryStats = db.prepare(`
@@ -1274,6 +1330,7 @@ export const dbHelpers = {
       totalPurchaseValue: purchaseValueRow.total || 0,
       completedPurchaseValue: completedValueRow.total || 0,
       totalModels: totalModelsRow.count,
+      totalConfigurations,
       totalBrands: totalBrandsRow.count,
       totalUsers: totalUsersRow.count || 240, // baseline active user estimate
       categoryStats,

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbHelpers } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -13,7 +16,10 @@ export async function GET(request: NextRequest) {
     }
 
     const questions = dbHelpers.getQuestionsForDevice(categoryId, brandId, modelId);
-    return NextResponse.json({ success: true, data: questions });
+    return NextResponse.json(
+      { success: true, data: questions },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

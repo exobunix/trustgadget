@@ -86,12 +86,10 @@ function exportSeedData() {
   const seedDataPath = path.resolve(__dirname, '../src/lib/seed-data.ts');
   const currentContent = fs.readFileSync(seedDataPath, 'utf8');
 
-  // We want to replace SEED_BRANDS and SEED_MODELS while keeping categories, questions, etc.
   const brandsStartIdx = currentContent.indexOf('export const SEED_BRANDS: SeedBrand[] = [');
-  const modelsStartIdx = currentContent.indexOf('export const SEED_MODELS: SeedModel[] = [');
   const questionsStartIdx = currentContent.indexOf('export const SEED_QUESTIONS: SeedQuestion[] = [');
 
-  if (brandsStartIdx === -1 || modelsStartIdx === -1 || questionsStartIdx === -1) {
+  if (brandsStartIdx === -1 || questionsStartIdx === -1) {
     console.error('Could not locate markers in seed-data.ts');
     return;
   }
@@ -99,8 +97,12 @@ function exportSeedData() {
   const beforeBrands = currentContent.substring(0, brandsStartIdx);
   const afterModels = currentContent.substring(questionsStartIdx);
 
+  const modelsJsonPath = path.resolve(__dirname, '../src/lib/seed-models.json');
+  fs.writeFileSync(modelsJsonPath, JSON.stringify(seedModels, null, 2), 'utf8');
+  console.log('Successfully wrote src/lib/seed-models.json!');
+
   const newBrandsStr = `export const SEED_BRANDS: SeedBrand[] = ${JSON.stringify(seedBrands, null, 2)};\n\n`;
-  const newModelsStr = `export const SEED_MODELS: SeedModel[] = ${JSON.stringify(seedModels, null, 2)};\n\n`;
+  const newModelsStr = `export const SEED_MODELS: SeedModel[] = require('./seed-models.json') as SeedModel[];\n\n`;
 
   const updatedFileContent = beforeBrands + newBrandsStr + newModelsStr + afterModels;
   fs.writeFileSync(seedDataPath, updatedFileContent, 'utf8');

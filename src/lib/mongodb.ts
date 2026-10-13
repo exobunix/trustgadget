@@ -205,3 +205,61 @@ export const MongoVariant = mongoose.models.Variant || mongoose.model('Variant',
 export const MongoOrder = mongoose.models.Order || mongoose.model('Order', OrderSchema);
 export const MongoSupportTicket = mongoose.models.SupportTicket || mongoose.model('SupportTicket', SupportTicketSchema);
 export const MongoCoupon = mongoose.models.Coupon || mongoose.model('Coupon', CouponSchema);
+
+/* -------------------------------------------------------------
+ * QUESTION & PRICING RULE SCHEMAS (Persistent MongoDB Source of Truth)
+ * ------------------------------------------------------------- */
+
+const AnswerSubSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  questionId: { type: String },
+  code: { type: String, required: true },
+  label: { type: String, required: true },
+  description: { type: String },
+  icon: { type: String },
+  adjustmentType: { type: String, default: 'FIXED' },
+  adjustmentValue: { type: Number, default: 0 },
+  isRejection: { type: Boolean, default: false },
+  warningMessage: { type: String },
+  displayOrder: { type: Number, default: 0 },
+  isActive: { type: Boolean, default: true },
+}, { _id: false });
+
+const QuestionSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  categoryId: { type: String },
+  targetCategory: { type: String, default: 'ALL' },
+  brandId: { type: String },
+  modelId: { type: String },
+  title: { type: String, required: true },
+  subtitle: { type: String },
+  code: { type: String, required: true, unique: true },
+  questionType: { type: String, default: 'SINGLE_CHOICE' },
+  isRequired: { type: Boolean, default: true },
+  displayOrder: { type: Number, default: 0 },
+  isActive: { type: Boolean, default: true },
+  answers: [AnswerSubSchema],
+}, { timestamps: true });
+
+const PricingRuleSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  categoryId: { type: String },
+  targetCategory: { type: String, default: 'ALL' },
+  brandId: { type: String },
+  modelId: { type: String },
+  variantId: { type: String },
+  questionCode: { type: String },
+  answerCode: { type: String },
+  ruleType: { type: String, default: 'DEDUCTION' },
+  adjustmentType: { type: String, default: 'FIXED' },
+  adjustmentValue: { type: Number, default: 0 },
+  priorityLevel: { type: String, default: 'GLOBAL' },
+  maxCap: { type: Number },
+  minCap: { type: Number },
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true });
+
+export const MongoQuestion = mongoose.models.Question || mongoose.model('Question', QuestionSchema);
+export const MongoPricingRule = mongoose.models.PricingRule || mongoose.model('PricingRule', PricingRuleSchema);
+

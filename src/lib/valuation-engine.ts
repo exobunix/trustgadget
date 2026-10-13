@@ -1,4 +1,5 @@
 import { db } from './db';
+import { isQuestionApplicable } from './question-targeting';
 
 export interface AnswerSelection {
   questionCode: string;
@@ -22,43 +23,64 @@ export interface ValuationResult {
   estimatedPrice: number;
   totalAdditions: number;
   totalDeductions: number;
+  percentageDeductionRate: number;
+  percentageDeductionAmount: number;
+  fixedDeductionAmount: number;
   adjustments: ValuationAdjustment[];
   isRejected: boolean;
   rejectionReason: string | null;
   ruleAuditLog: string[];
 }
 
+/**
+ * TrustGadgetMart Standard Pricing Engine
+ *
+ * FORMULA:
+ * Final Price = Base Price - Total Deductions
+ * Total Deductions = Percentage Deductions + Fixed Deductions
+ * Percentage Deductions = Base Price * (Sum of Selected Deduction Percentages / 100)
+ *
+ * All selected percentage deductions are summed together first and applied
+ * to the original base price exactly once.
+ */
 export function calculateValuation(
   modelId: string,
   variantId: string | null,
   answers: AnswerSelection[]
 ): ValuationResult {
   // 1. Fetch Model & Variant
-  const model = db.prepare('SELECT * FROM models WHERE id = ?').get(modelId) as any;
+  const model = db.prepare('SELECT m.*, b.name as brandName FROM models m LEFT JOIN brands b ON m.brandId = b.id WHERE m.id = ?').get(modelId) as any;
   if (!model) {
     throw new Error(`Model with id ${modelId} not found`);
   }
 
-  let basePrice = model.basePrice;
+  let basePrice = Number(model.basePrice) || 0;
   let variant: any = null;
 
-  if (variantId) {
+  if (variantId && variantId !== 'DEFAULT') {
     variant = db.prepare('SELECT * FROM variants WHERE id = ?').get(variantId) as any;
     if (variant && variant.basePrice) {
-      basePrice = variant.basePrice;
+      basePrice = Number(variant.basePrice) || basePrice;
     }
   }
 
-  // 2. Fetch Questions and Answers matching the answers submitted
-  const adjustments: ValuationAdjustment[] = [];
-  const ruleAuditLog: string[] = [`Base Price for ${model.name} (${variant ? variant.name : 'Default'}): ₹${basePrice.toLocaleString('en-IN')}`];
+  const deviceContext = {
+    categoryId: model.categoryId,
+    brandId: model.brandId,
+    brandName: model.brandName,
+    modelId: model.id,
+    modelName: model.name,
+    series: model.series,
+  };
 
-  let totalAdditions = 0;
-  let totalDeductions = 0;
+  const ruleAuditLog: string[] = [
+    `Base Price for ${model.name} (${variant ? variant.name : 'Standard'}): ₹${basePrice.toLocaleString('en-IN')}`,
+  ];
+
   let isRejected = false;
   let rejectionReason: string | null = null;
 
-  // Fetch all active pricing rules for overriding
+  // Active pricing rules for overriding answers
   const pricingRules = db.prepare(`
     SELECT * FROM pricing_rules 
     WHERE isActive = 1 
@@ -67,10 +89,22 @@ export function calculateValuation(
       AND (categoryId = ? OR categoryId IS NULL)
   `).all(model.id, model.brandId, model.categoryId) as any[];
 
+  const adjustments: ValuationAdjustment[] = [];
+
+  let sumPercentageDeductions = 0;
+  let sumFixedDeductions = 0;
+  let sumAdditions = 0;
+
   for (const item of answers) {
     // Find Question
     const question = db.prepare('SELECT * FROM questions WHERE code = ?').get(item.questionCode) as any;
     if (!question) continue;
+
+    // Verify question is applicable to this device
+    if (!isQuestionApplicable(question, deviceContext)) {
+      ruleAuditLog.push(`[SKIPPED - INCOMPATIBLE] Question "${question.title}" (${question.code}) does not apply to this device`);
+      continue;
+    }
 
     // Find Answer
     const answer = db.prepare('SELECT * FROM answers WHERE questionId = ? AND code = ?').get(question.id, item.answerCode) as any;
@@ -84,40 +118,50 @@ export function calculateValuation(
     }
 
     // Check if custom pricing rule overrides this answer
-    let adjType: 'FIXED' | 'PERCENTAGE' = answer.adjustmentType;
-    let adjValue: number = answer.adjustmentValue;
+    let adjType: 'FIXED' | 'PERCENTAGE' = answer.adjustmentType === 'PERCENTAGE' ? 'PERCENTAGE' : 'FIXED';
+    let rawValue: number = Number(answer.adjustmentValue) || 0;
+    let ruleType: 'DEDUCTION' | 'ADDITION' = 'DEDUCTION';
 
-    // Find highest priority matching rule (Variant > Model > Brand > Category > Global)
+    // Find highest priority matching rule
     const matchingRule = pricingRules
-      .filter(r => (!r.questionCode || r.questionCode === item.questionCode) && (!r.answerCode || r.answerCode === item.answerCode))
+      .filter((r) => (!r.questionCode || r.questionCode === item.questionCode) && (!r.answerCode || r.answerCode === item.answerCode))
       .sort((a, b) => {
         const priorityOrder: Record<string, number> = { VARIANT: 5, MODEL: 4, BRAND: 3, CATEGORY: 2, GLOBAL: 1 };
         return (priorityOrder[b.priorityLevel] || 0) - (priorityOrder[a.priorityLevel] || 0);
       })[0];
 
     if (matchingRule) {
-      adjType = matchingRule.adjustmentType;
-      adjValue = matchingRule.adjustmentValue;
-      ruleAuditLog.push(`[RULE OVERRIDE - ${matchingRule.name}] Applied ${matchingRule.priorityLevel} rule (${adjType} ${adjValue})`);
+      adjType = matchingRule.adjustmentType === 'PERCENTAGE' ? 'PERCENTAGE' : 'FIXED';
+      rawValue = Number(matchingRule.adjustmentValue) || 0;
+      ruleType = matchingRule.ruleType === 'ADDITION' ? 'ADDITION' : 'DEDUCTION';
+      ruleAuditLog.push(`[RULE OVERRIDE - ${matchingRule.name}] Applied ${matchingRule.priorityLevel} rule (${adjType} ${rawValue})`);
     }
 
-    // Calculate actual INR amount
-    let calculatedAmount = 0;
-    if (adjType === 'PERCENTAGE') {
-      calculatedAmount = Math.round((basePrice * adjValue) / 100);
-    } else {
-      calculatedAmount = adjValue;
-    }
-
+    // Determine normalized adjustment:
+    // Legacy convention: negative numbers indicate deductions (e.g. -70 = 70% deduction or -2000 = ₹2,000 deduction)
+    // Positive numbers with ruleType !== 'ADDITION' are also deduction rates (e.g. 15 = 15% deduction)
     let type: 'ADDITION' | 'DEDUCTION' | 'NEUTRAL' = 'NEUTRAL';
-    if (calculatedAmount > 0) {
+    let calculatedAmount = 0;
+
+    if (ruleType === 'ADDITION' || rawValue > 0 && matchingRule?.ruleType === 'ADDITION') {
       type = 'ADDITION';
-      totalAdditions += calculatedAmount;
+      calculatedAmount = Math.abs(rawValue);
+      sumAdditions += calculatedAmount;
       ruleAuditLog.push(`[BONUS +₹${calculatedAmount.toLocaleString('en-IN')}] ${question.title}: ${answer.label}`);
-    } else if (calculatedAmount < 0) {
+    } else if (rawValue !== 0) {
       type = 'DEDUCTION';
-      totalDeductions += Math.abs(calculatedAmount);
-      ruleAuditLog.push(`[DEDUCTION -₹${Math.abs(calculatedAmount).toLocaleString('en-IN')}] ${question.title}: ${answer.label}`);
+      const magnitude = Math.abs(rawValue);
+
+      if (adjType === 'PERCENTAGE') {
+        sumPercentageDeductions += magnitude;
+        // Individual preview amount for UI inspection
+        calculatedAmount = Math.round((basePrice * magnitude) / 100);
+        ruleAuditLog.push(`[PERCENTAGE DEDUCTION -${magnitude}% (≈ ₹${calculatedAmount.toLocaleString('en-IN')})] ${question.title}: ${answer.label}`);
+      } else {
+        sumFixedDeductions += magnitude;
+        calculatedAmount = magnitude;
+        ruleAuditLog.push(`[FIXED DEDUCTION -₹${magnitude.toLocaleString('en-IN')}] ${question.title}: ${answer.label}`);
+      }
     }
 
     adjustments.push({
@@ -125,34 +169,43 @@ export function calculateValuation(
       answerLabel: answer.label,
       type,
       adjustmentType: adjType,
-      adjustmentValue: adjValue,
+      adjustmentValue: rawValue,
       calculatedAmount,
       reason: answer.description || answer.label,
       isRejection: answer.isRejection === 1,
     });
   }
 
-  let estimatedPrice = basePrice + totalAdditions - totalDeductions;
-  
-  // Enforce realistic bounds
+  // Mandatory Calculation Step:
+  // Combined percentage deduction applied directly to original base price once
+  const percentageDeductionAmount = Math.round(basePrice * (sumPercentageDeductions / 100));
+  const totalDeductions = percentageDeductionAmount + sumFixedDeductions;
+
+  let finalPrice = basePrice + sumAdditions - totalDeductions;
+
   if (isRejected) {
-    estimatedPrice = 0;
+    finalPrice = 0;
+    ruleAuditLog.push(`[FINAL] Device Rejected (₹0) - ${rejectionReason}`);
   } else {
-    // Minimum salvage floor value
-    const floorPrice = Math.max(500, Math.round(basePrice * 0.15));
-    if (estimatedPrice < floorPrice) {
-      estimatedPrice = floorPrice;
-      ruleAuditLog.push(`[FLOOR VALUE APPLIED] Price adjusted to minimum salvage threshold of ₹${floorPrice.toLocaleString('en-IN')}`);
+    // Floor at ₹0
+    if (finalPrice < 0) {
+      finalPrice = 0;
+      ruleAuditLog.push(`[FLOOR] Final price capped to minimum ₹0`);
     }
   }
 
-  ruleAuditLog.push(`Final Calculated Value: ₹${estimatedPrice.toLocaleString('en-IN')}`);
+  ruleAuditLog.push(
+    `[SUMMARY] Base: ₹${basePrice.toLocaleString('en-IN')} | Total %: ${sumPercentageDeductions}% (-₹${percentageDeductionAmount.toLocaleString('en-IN')}) | Fixed Deductions: -₹${sumFixedDeductions.toLocaleString('en-IN')} | Total Deductions: -₹${totalDeductions.toLocaleString('en-IN')} | Final: ₹${finalPrice.toLocaleString('en-IN')}`
+  );
 
   return {
     basePrice,
-    estimatedPrice,
-    totalAdditions,
+    estimatedPrice: finalPrice,
+    totalAdditions: sumAdditions,
     totalDeductions,
+    percentageDeductionRate: sumPercentageDeductions,
+    percentageDeductionAmount,
+    fixedDeductionAmount: sumFixedDeductions,
     adjustments,
     isRejected,
     rejectionReason,

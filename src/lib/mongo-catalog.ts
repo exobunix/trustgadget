@@ -11,7 +11,14 @@
  */
 
 import { connectToDatabase } from './mongodb';
-import { MongoModel, MongoVariant, MongoBrand, MongoCategory } from './mongodb';
+import {
+  MongoModel,
+  MongoVariant,
+  MongoBrand,
+  MongoCategory,
+  MongoQuestion,
+  MongoPricingRule,
+} from './mongodb';
 
 // ---------------------------------------------------------------------------
 // HELPERS
@@ -460,3 +467,389 @@ export async function seedMongoFromSqlite(sqliteDb: any) {
     console.warn('[mongo-catalog] seedMongoFromSqlite error:', e);
   }
 }
+
+// ---------------------------------------------------------------------------
+// QUESTIONS & ANSWERS (Persistent MongoDB Source of Truth)
+// ---------------------------------------------------------------------------
+
+export async function mongoGetAllQuestions() {
+  if (!(await ensureMongo())) return null;
+  try {
+    const questions = await MongoQuestion.find({}).sort({ displayOrder: 1, createdAt: 1 }).lean();
+    return questions.map((q: any) => ({
+      ...q,
+      targetCategory: q.targetCategory || 'ALL',
+      answers: Array.isArray(q.answers) ? q.answers.sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0)) : [],
+    }));
+  } catch (e) {
+    console.warn('[mongo-catalog] mongoGetAllQuestions error:', e);
+    return null;
+  }
+}
+
+export async function mongoUpsertQuestion(questionData: any, answers?: any[]) {
+  if (!(await ensureMongo())) return false;
+  try {
+    const clean: any = { ...questionData };
+    clean.updatedAt = new Date();
+    clean.targetCategory = clean.targetCategory || 'ALL';
+
+    if (Array.isArray(answers)) {
+      clean.answers = answers.map((a: any, idx: number) => ({
+        id: a.id && !a.id.startsWith('ans_temp_') ? a.id : `ans_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+        questionId: questionData.id,
+        code: a.code || `OPT_${idx + 1}`,
+        label: a.label || 'Choice',
+        description: a.description || null,
+        icon: a.icon || null,
+        adjustmentType: a.adjustmentType || 'FIXED',
+        adjustmentValue: Number(a.adjustmentValue) || 0,
+        isRejection: Boolean(a.isRejection),
+        warningMessage: a.warningMessage || null,
+        displayOrder: a.displayOrder || (idx + 1),
+        isActive: a.isActive !== false,
+      }));
+    }
+
+    await MongoQuestion.findOneAndUpdate(
+      { id: questionData.id },
+      { $set: clean },
+      { upsert: true, new: true }
+    );
+    return true;
+  } catch (e) {
+    console.warn('[mongo-catalog] mongoUpsertQuestion error:', e);
+    return false;
+  }
+}
+
+export async function mongoDeleteQuestion(questionId: string) {
+  if (!(await ensureMongo())) return false;
+  try {
+    await MongoQuestion.deleteOne({ id: questionId });
+    return true;
+  } catch (e) {
+    console.warn('[mongo-catalog] mongoDeleteQuestion error:', e);
+    return false;
+  }
+}
+
+export async function mongoUpdateAnswer(answerId: string, questionId: string, updateFields: any) {
+  if (!(await ensureMongo())) return null;
+  try {
+    const question = await MongoQuestion.findOne({ id: questionId });
+    if (!question) return null;
+
+    let ansIndex = question.answers.findIndex((a: any) => a.id === answerId);
+    if (ansIndex === -1 && answerId.startsWith('ans_temp_')) {
+      const realId = `ans_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      question.answers.push({
+        id: realId,
+        questionId,
+        code: updateFields.code || `OPT_${Date.now().toString().slice(-4)}`,
+        label: updateFields.label || 'New Option',
+        description: updateFields.description || null,
+        icon: updateFields.icon || null,
+        adjustmentType: updateFields.adjustmentType || 'FIXED',
+        adjustmentValue: Number(updateFields.adjustmentValue) || 0,
+        isRejection: Boolean(updateFields.isRejection),
+        warningMessage: updateFields.warningMessage || null,
+        displayOrder: 99,
+        isActive: true,
+      });
+      await question.save();
+      return realId;
+    } else if (ansIndex !== -1) {
+      const existing = question.answers[ansIndex];
+      for (const [k, v] of Object.entries(updateFields)) {
+        if (v !== undefined) (existing as any)[k] = v;
+      }
+      question.answers[ansIndex] = existing;
+      await question.save();
+      return answerId;
+    }
+    return null;
+  } catch (e) {
+    console.warn('[mongo-catalog] mongoUpdateAnswer error:', e);
+    return null;
+  }
+}
+
+export async function mongoDeleteAnswer(answerId: string) {
+  if (!(await ensureMongo())) return false;
+  try {
+    await MongoQuestion.updateMany(
+      {},
+      { $pull: { answers: { id: answerId } } }
+    );
+    return true;
+  } catch (e) {
+    console.warn('[mongo-catalog] mongoDeleteAnswer error:', e);
+    return false;
+  }
+}
+
+export async function syncMongoQuestionsToSqlite(sqliteDb: any) {
+  if (!(await ensureMongo())) return;
+  try {
+    const mongoQuestions = (await MongoQuestion.find({}).lean()) as any[];
+    if (!mongoQuestions || mongoQuestions.length === 0) return;
+
+    const upsertQ = sqliteDb.prepare(`
+      INSERT OR REPLACE INTO questions (
+        id, categoryId, targetCategory, brandId, modelId, title, subtitle,
+        code, questionType, isRequired, displayOrder, isActive, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `);
+
+    const upsertA = sqliteDb.prepare(`
+      INSERT OR REPLACE INTO answers (
+        id, questionId, code, label, description, icon, adjustmentType,
+        adjustmentValue, isRejection, warningMessage, displayOrder, isActive, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `);
+
+    const deleteOldA = sqliteDb.prepare('DELETE FROM answers WHERE questionId = ?');
+
+    const tx = sqliteDb.transaction(() => {
+      for (const q of mongoQuestions) {
+        upsertQ.run(
+          q.id,
+          q.categoryId || null,
+          q.targetCategory || 'ALL',
+          q.brandId || null,
+          q.modelId || null,
+          q.title,
+          q.subtitle || null,
+          q.code,
+          q.questionType || 'SINGLE_CHOICE',
+          q.isRequired !== false ? 1 : 0,
+          q.displayOrder || 0,
+          q.isActive !== false ? 1 : 0
+        );
+
+        if (Array.isArray(q.answers) && q.answers.length > 0) {
+          deleteOldA.run(q.id);
+          for (let i = 0; i < q.answers.length; i++) {
+            const a = q.answers[i];
+            upsertA.run(
+              a.id,
+              q.id,
+              a.code,
+              a.label,
+              a.description || null,
+              a.icon || null,
+              a.adjustmentType || 'FIXED',
+              Number(a.adjustmentValue) || 0,
+              a.isRejection ? 1 : 0,
+              a.warningMessage || null,
+              a.displayOrder || (i + 1),
+              a.isActive !== false ? 1 : 0
+            );
+          }
+        }
+      }
+    });
+
+    tx();
+    console.log(`[mongo-catalog] Synced ${mongoQuestions.length} questions from MongoDB → SQLite`);
+  } catch (e) {
+    console.warn('[mongo-catalog] syncMongoQuestionsToSqlite error:', e);
+  }
+}
+
+export async function seedMongoQuestionsFromSqlite(sqliteDb: any) {
+  if (!(await ensureMongo())) return;
+  try {
+    const existingCount = await MongoQuestion.countDocuments();
+    if (existingCount > 0) return;
+
+    const questions = sqliteDb.prepare('SELECT * FROM questions').all() as any[];
+    const getAnswers = sqliteDb.prepare('SELECT * FROM answers WHERE questionId = ? ORDER BY displayOrder ASC');
+
+    const ops = questions.map((q: any) => {
+      const answers = getAnswers.all(q.id).map((a: any) => ({
+        id: a.id,
+        questionId: q.id,
+        code: a.code,
+        label: a.label,
+        description: a.description || null,
+        icon: a.icon || null,
+        adjustmentType: a.adjustmentType || 'FIXED',
+        adjustmentValue: Number(a.adjustmentValue) || 0,
+        isRejection: a.isRejection === 1,
+        warningMessage: a.warningMessage || null,
+        displayOrder: a.displayOrder || 0,
+        isActive: a.isActive === 1,
+      }));
+
+      let target = q.targetCategory;
+      if (!target || target === 'ALL') {
+        if (q.code.startsWith('PHONE_')) target = 'SMARTPHONE';
+        else if (q.code.startsWith('LAPTOP_')) target = 'LAPTOP';
+        else target = 'ALL';
+      }
+
+      return {
+        updateOne: {
+          filter: { id: q.id },
+          update: {
+            $setOnInsert: {
+              id: q.id,
+              categoryId: q.categoryId || (target === 'SMARTPHONE' ? 'cat_smartphone' : target === 'LAPTOP' ? 'cat_laptop' : null),
+              targetCategory: target,
+              brandId: q.brandId || null,
+              modelId: q.modelId || null,
+              title: q.title,
+              subtitle: q.subtitle || null,
+              code: q.code,
+              questionType: q.questionType || 'SINGLE_CHOICE',
+              isRequired: q.isRequired === 1,
+              displayOrder: q.displayOrder || 0,
+              isActive: q.isActive === 1,
+              answers,
+            },
+          },
+          upsert: true,
+        },
+      };
+    });
+
+    if (ops.length > 0) {
+      await MongoQuestion.bulkWrite(ops);
+      console.log(`[mongo-catalog] Seeded ${ops.length} questions into MongoDB`);
+    }
+  } catch (e) {
+    console.warn('[mongo-catalog] seedMongoQuestionsFromSqlite error:', e);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PRICING RULES (Persistent MongoDB Source of Truth)
+// ---------------------------------------------------------------------------
+
+export async function mongoGetAllPricingRules(filter: any = {}) {
+  if (!(await ensureMongo())) return null;
+  try {
+    return await MongoPricingRule.find(filter).sort({ createdAt: -1 }).lean();
+  } catch (e) {
+    console.warn('[mongo-catalog] mongoGetAllPricingRules error:', e);
+    return null;
+  }
+}
+
+export async function mongoUpsertPricingRule(ruleData: any) {
+  if (!(await ensureMongo())) return false;
+  try {
+    const clean: any = { ...ruleData };
+    clean.updatedAt = new Date();
+    await MongoPricingRule.findOneAndUpdate(
+      { id: ruleData.id },
+      { $set: clean },
+      { upsert: true, new: true }
+    );
+    return true;
+  } catch (e) {
+    console.warn('[mongo-catalog] mongoUpsertPricingRule error:', e);
+    return false;
+  }
+}
+
+export async function mongoDeletePricingRule(ruleId: string) {
+  if (!(await ensureMongo())) return false;
+  try {
+    await MongoPricingRule.deleteOne({ id: ruleId });
+    return true;
+  } catch (e) {
+    console.warn('[mongo-catalog] mongoDeletePricingRule error:', e);
+    return false;
+  }
+}
+
+export async function syncMongoPricingRulesToSqlite(sqliteDb: any) {
+  if (!(await ensureMongo())) return;
+  try {
+    const rules = (await MongoPricingRule.find({}).lean()) as any[];
+    if (!rules || rules.length === 0) return;
+
+    const upsertR = sqliteDb.prepare(`
+      INSERT OR REPLACE INTO pricing_rules (
+        id, name, categoryId, targetCategory, brandId, modelId, variantId,
+        questionCode, answerCode, ruleType, adjustmentType, adjustmentValue,
+        priorityLevel, maxCap, minCap, isActive, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `);
+
+    const tx = sqliteDb.transaction(() => {
+      for (const r of rules) {
+        upsertR.run(
+          r.id,
+          r.name,
+          r.categoryId || null,
+          r.targetCategory || 'ALL',
+          r.brandId || null,
+          r.modelId || null,
+          r.variantId || null,
+          r.questionCode || null,
+          r.answerCode || null,
+          r.ruleType || 'DEDUCTION',
+          r.adjustmentType || 'FIXED',
+          Number(r.adjustmentValue) || 0,
+          r.priorityLevel || 'GLOBAL',
+          r.maxCap || null,
+          r.minCap || null,
+          r.isActive !== false ? 1 : 0
+        );
+      }
+    });
+
+    tx();
+    console.log(`[mongo-catalog] Synced ${rules.length} pricing rules from MongoDB → SQLite`);
+  } catch (e) {
+    console.warn('[mongo-catalog] syncMongoPricingRulesToSqlite error:', e);
+  }
+}
+
+export async function seedMongoPricingRulesFromSqlite(sqliteDb: any) {
+  if (!(await ensureMongo())) return;
+  try {
+    const existingCount = await MongoPricingRule.countDocuments();
+    if (existingCount > 0) return;
+
+    const rules = sqliteDb.prepare('SELECT * FROM pricing_rules').all() as any[];
+    if (rules.length === 0) return;
+
+    const ops = rules.map((r: any) => ({
+      updateOne: {
+        filter: { id: r.id },
+        update: {
+          $setOnInsert: {
+            id: r.id,
+            name: r.name,
+            categoryId: r.categoryId || null,
+            targetCategory: r.targetCategory || 'ALL',
+            brandId: r.brandId || null,
+            modelId: r.modelId || null,
+            variantId: r.variantId || null,
+            questionCode: r.questionCode || null,
+            answerCode: r.answerCode || null,
+            ruleType: r.ruleType || 'DEDUCTION',
+            adjustmentType: r.adjustmentType || 'FIXED',
+            adjustmentValue: Number(r.adjustmentValue) || 0,
+            priorityLevel: r.priorityLevel || 'GLOBAL',
+            maxCap: r.maxCap || null,
+            minCap: r.minCap || null,
+            isActive: r.isActive === 1,
+          },
+        },
+        upsert: true,
+      },
+    }));
+
+    await MongoPricingRule.bulkWrite(ops);
+    console.log(`[mongo-catalog] Seeded ${ops.length} pricing rules into MongoDB`);
+  } catch (e) {
+    console.warn('[mongo-catalog] seedMongoPricingRulesFromSqlite error:', e);
+  }
+}
+

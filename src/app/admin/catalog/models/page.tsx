@@ -63,9 +63,11 @@ export default function AdminModelsPage() {
   ]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
 
   const fetchModels = async () => {
     setLoading(true);
+    setCatalogError(null);
     try {
       const cacheBust = `?_t=${Date.now()}`;
       const [mRes, bRes, cRes] = await Promise.all([
@@ -77,7 +79,11 @@ export default function AdminModelsPage() {
       const bData = await bRes.json();
       const cData = await cRes.json();
 
-      if (mData.success) setModels(mData.data);
+      if (mData.success && Array.isArray(mData.data)) {
+        setModels(mData.data);
+      } else {
+        setCatalogError(mData.error || 'Failed to load device models from persistent database');
+      }
       if (bData.success) {
         setBrands(bData.data);
         if (!brandId && bData.data.length > 0) setBrandId(bData.data[0].id);
@@ -86,8 +92,9 @@ export default function AdminModelsPage() {
         setCategories(cData.data);
         if (!categoryId && cData.data.length > 0) setCategoryId(cData.data[0].id);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setCatalogError(e.message || 'Network connection error while fetching hardware catalog');
     } finally {
       setLoading(false);
     }
@@ -625,6 +632,22 @@ export default function AdminModelsPage() {
             className="text-slate-400 hover:text-white text-xs px-2 py-0.5 rounded cursor-pointer"
           >
             ✕
+          </button>
+        </div>
+      )}
+
+      {/* Catalog Load Error Banner */}
+      {catalogError && (
+        <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs font-semibold flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-400 shrink-0" />
+            <span>Database Catalog Error: {catalogError}</span>
+          </div>
+          <button
+            onClick={fetchModels}
+            className="px-3.5 py-1.5 rounded-xl bg-rose-500/30 hover:bg-rose-500/40 text-rose-100 text-xs font-bold transition-colors cursor-pointer"
+          >
+            Retry Loading Catalog
           </button>
         </div>
       )}
