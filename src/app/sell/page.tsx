@@ -292,12 +292,17 @@ function SellPageContent() {
     setCouponError('');
 
     try {
+      const currentPrice =
+        valuationResult?.estimatedPrice !== undefined && valuationResult?.estimatedPrice !== null
+          ? Math.max(0, valuationResult.estimatedPrice)
+          : (selectedVariant?.basePrice ?? selectedModel?.basePrice ?? 20000);
+
       const res = await fetch('/api/coupons/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: couponCode.trim(),
-          deviceValue: valuationResult?.estimatedPrice || selectedModel?.basePrice || 20000,
+          deviceValue: currentPrice,
         }),
       });
       const data = await res.json();
@@ -317,7 +322,27 @@ function SellPageContent() {
   // Proceed to Checkout
   const handleProceedCheckout = () => {
     if (!selectedModel) return;
-    const finalPrice = (valuationResult?.estimatedPrice || selectedModel.basePrice) + (appliedCoupon?.bonusAmount || 0);
+    const effectiveEstimatedPrice =
+      valuationResult?.estimatedPrice !== undefined && valuationResult?.estimatedPrice !== null
+        ? Math.max(0, valuationResult.estimatedPrice)
+        : (selectedVariant?.basePrice ?? selectedModel.basePrice);
+
+    const finalPrice = Math.max(0, effectiveEstimatedPrice + (appliedCoupon?.bonusAmount || 0));
+
+    // Prepare human-readable enriched conditions
+    const enrichedConditions = questions.map((q) => {
+      const selectedCodes = answers[q.code] || [];
+      const selectedLabels = selectedCodes.map((code) => {
+        const matchedAns = q.answers?.find((a: any) => a.code === code);
+        return matchedAns?.label || code;
+      });
+      return {
+        questionCode: q.code,
+        questionTitle: q.title,
+        selectedCodes,
+        selectedLabels,
+      };
+    }).filter((item) => item.selectedCodes.length > 0);
 
     const tradeInState = {
       categoryId: selectedCategory?.id,
@@ -326,12 +351,12 @@ function SellPageContent() {
       modelName: selectedModel.name,
       variantName: selectedVariant?.name || 'Standard',
       deviceImageUrl: selectedModel.imageUrl,
-      basePrice: valuationResult?.basePrice || selectedModel.basePrice,
+      basePrice: selectedVariant?.basePrice ?? selectedModel.basePrice,
       estimatedPrice: finalPrice,
       couponBonus: appliedCoupon?.bonusAmount || 0,
       couponCode: appliedCoupon?.code || '',
       answers,
-      conditionSummary: answers,
+      conditionSummary: enrichedConditions.length > 0 ? enrichedConditions : answers,
     };
 
     localStorage.setItem('tmg_current_tradein', JSON.stringify(tradeInState));
@@ -346,7 +371,12 @@ function SellPageContent() {
     (m.series && m.series.toLowerCase().includes(modelSearch.toLowerCase()))
   );
 
-  const finalEstimatedPayout = (valuationResult?.estimatedPrice || selectedModel?.basePrice || 0) + (appliedCoupon?.bonusAmount || 0);
+  const effectiveEstimatedPrice =
+    valuationResult?.estimatedPrice !== undefined && valuationResult?.estimatedPrice !== null
+      ? Math.max(0, valuationResult.estimatedPrice)
+      : (selectedVariant?.basePrice ?? selectedModel?.basePrice ?? 0);
+
+  const finalEstimatedPayout = Math.max(0, effectiveEstimatedPrice + (appliedCoupon?.bonusAmount || 0));
 
   return (
     <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8 font-sans">
@@ -713,10 +743,38 @@ function SellPageContent() {
                               } else {
                                 setAnswers((prev) => {
                                   const cur = prev[currentQ.code] || [];
-                                  if (cur.includes(ans.code)) {
-                                    return { ...prev, [currentQ.code]: cur.filter((c) => c !== ans.code) };
+                                  const isNoDefect =
+                                    ans.code === 'PERFECT' ||
+                                    ans.code === 'FLAWLESS' ||
+                                    ans.code === 'NO_DEFECTS' ||
+                                    ans.label.toLowerCase().includes('no physical defects') ||
+                                    ans.label.toLowerCase().includes('no defects') ||
+                                    ans.label.toLowerCase().includes('flawless');
+
+                                  if (isNoDefect) {
+                                    if (cur.includes(ans.code)) {
+                                      return { ...prev, [currentQ.code]: [] };
+                                    } else {
+                                      return { ...prev, [currentQ.code]: [ans.code] };
+                                    }
                                   } else {
-                                    return { ...prev, [currentQ.code]: [...cur, ans.code] };
+                                    const filteredCur = cur.filter((c) => {
+                                      const matchAns = currentQ.answers?.find((a: any) => a.code === c);
+                                      const isAnsNoDefect =
+                                        c === 'PERFECT' ||
+                                        c === 'FLAWLESS' ||
+                                        c === 'NO_DEFECTS' ||
+                                        matchAns?.label?.toLowerCase().includes('no physical defects') ||
+                                        matchAns?.label?.toLowerCase().includes('no defects') ||
+                                        matchAns?.label?.toLowerCase().includes('flawless');
+                                      return !isAnsNoDefect;
+                                    });
+
+                                    if (filteredCur.includes(ans.code)) {
+                                      return { ...prev, [currentQ.code]: filteredCur.filter((c) => c !== ans.code) };
+                                    } else {
+                                      return { ...prev, [currentQ.code]: [...filteredCur, ans.code] };
+                                    }
                                   }
                                 });
                               }
@@ -821,7 +879,7 @@ function SellPageContent() {
                 <div className="flex justify-between items-center text-xs py-1 border-b border-slate-800 text-slate-400">
                   <span>Base Market Price</span>
                   <span className="font-mono font-bold text-white">
-                    ₹{(valuationResult?.basePrice || selectedModel.basePrice).toLocaleString('en-IN')}
+                    ₹{(selectedVariant?.basePrice ?? selectedModel.basePrice).toLocaleString('en-IN')}
                   </span>
                 </div>
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, dbHelpers } from '@/lib/db';
+import { resolveOrderConditions } from '@/lib/order-condition-formatter';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -31,9 +32,14 @@ export async function GET(request: NextRequest) {
     query += ' ORDER BY createdAt DESC LIMIT ?';
     params.push(limit);
 
-    const orders = db.prepare(query).all(...params);
+    const orders = db.prepare(query).all(...params) as any[];
+    const enrichedOrders = orders.map((ord: any) => ({
+      ...ord,
+      resolvedConditions: resolveOrderConditions(ord.conditionSummary),
+    }));
+
     return NextResponse.json(
-      { success: true, data: orders },
+      { success: true, data: enrichedOrders },
       {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

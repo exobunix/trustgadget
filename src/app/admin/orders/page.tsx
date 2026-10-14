@@ -370,47 +370,80 @@ export default function AdminOrdersPage() {
             <div className="space-y-3">
               <div className="font-bold text-white uppercase tracking-wider text-xs flex items-center justify-between">
                 <span>Customer Declared Condition & Diagnostic Answers:</span>
+                <span className="text-[10px] text-cyan-400 font-normal">Problems & Hardware Evaluation</span>
               </div>
 
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-1 text-xs">
-                {inspectOrder.conditionSummary ? (
-                  typeof inspectOrder.conditionSummary === 'string' ? (
-                    (() => {
-                      try {
-                        const parsed = JSON.parse(inspectOrder.conditionSummary);
-                        if (Array.isArray(parsed)) {
-                          return parsed.map((item: any, idx: number) => (
-                            <div key={idx} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                              <span className="text-slate-300 font-medium">{item.questionCode?.replace(/_/g, ' ')}</span>
-                              <span className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/30 font-bold">
-                                {item.answerCode?.replace(/_/g, ' ')}
-                              </span>
-                            </div>
-                          ));
-                        }
-                        return Object.entries(parsed).map(([k, v]) => (
-                          <div key={k} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                            <span className="text-slate-300 font-medium">{k.replace(/_/g, ' ')}</span>
-                            <span className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/30 font-bold">{String(v)}</span>
-                          </div>
-                        ));
-                      } catch (e) {
-                        return <div className="p-3 rounded-xl bg-slate-950 text-slate-300 font-mono">{inspectOrder.conditionSummary}</div>;
-                      }
-                    })()
-                  ) : (
-                    Object.entries(inspectOrder.conditionSummary).map(([k, v]) => (
-                      <div key={k} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                        <span className="text-slate-300 font-medium">{k.replace(/_/g, ' ')}</span>
-                        <span className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/30 font-bold">{String(v)}</span>
+              <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1 text-xs">
+                {(() => {
+                  const conditions = inspectOrder.resolvedConditions && inspectOrder.resolvedConditions.length > 0
+                    ? inspectOrder.resolvedConditions
+                    : (() => {
+                        try {
+                          const raw = typeof inspectOrder.conditionSummary === 'string'
+                            ? JSON.parse(inspectOrder.conditionSummary)
+                            : inspectOrder.conditionSummary;
+                          if (Array.isArray(raw) && raw.length > 0 && (raw[0].selectedLabels || raw[0].questionTitle)) {
+                            return raw;
+                          }
+                          if (typeof raw === 'object' && raw !== null) {
+                            return Object.entries(raw).map(([k, v]) => ({
+                              questionCode: k,
+                              questionTitle: k.replace(/^PHONE_/, '').replace(/^LAPTOP_/, '').replace(/^SMARTPHONE_/, '').replace(/_/g, ' '),
+                              selectedLabels: Array.isArray(v) ? v.map(String) : [String(v)],
+                            }));
+                          }
+                        } catch {}
+                        return null;
+                      })();
+
+                  if (!conditions || conditions.length === 0) {
+                    return (
+                      <div className="p-4 rounded-xl bg-slate-950 text-slate-500 italic text-center">
+                        No individual diagnostic answers recorded for this order.
                       </div>
-                    ))
-                  )
-                ) : (
-                  <div className="p-4 rounded-xl bg-slate-950 text-slate-500 italic text-center">
-                    No individual diagnostic answers recorded for this order.
-                  </div>
-                )}
+                    );
+                  }
+
+                  return conditions.map((item: any, idx: number) => {
+                    const labels: string[] = item.selectedLabels || item.selectedAnswers?.map((a: any) => a.label) || [];
+                    return (
+                      <div key={idx} className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-2">
+                        <div className="flex items-center justify-between pb-1 border-b border-slate-800/60">
+                          <span className="font-bold text-slate-200 flex items-center gap-2 capitalize">
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                            {item.questionTitle || item.questionCode}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {labels.length} {labels.length === 1 ? 'selected' : 'selected'}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                          {labels.map((lbl: string, lIdx: number) => {
+                            const isFlawless =
+                              lbl.toLowerCase().includes('flawless') ||
+                              lbl.toLowerCase().includes('no defect') ||
+                              lbl.toLowerCase().includes('perfect') ||
+                              lbl.toLowerCase().includes('boots up perfectly') ||
+                              lbl.toLowerCase().includes('100%');
+                            return (
+                              <span
+                                key={lIdx}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 border ${
+                                  isFlawless
+                                    ? 'bg-emerald-950/50 text-emerald-300 border-emerald-500/30'
+                                    : 'bg-rose-950/40 text-rose-200 border-rose-500/30'
+                                }`}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full ${isFlawless ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                                {lbl}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
 

@@ -167,18 +167,32 @@ export function isMultiChoiceQuestion(question: any): boolean {
 
   return (
     code.includes('FUNCTIONAL') ||
+    code.includes('PHYSICAL') ||
+    code.includes('CONDITION') ||
+    code.includes('BODY') ||
+    code.includes('SCREEN') ||
+    code.includes('GLASS') ||
+    code.includes('DAMAGE') ||
+    code.includes('DEFECT') ||
     code.includes('ISSUES') ||
-    code.includes('DEFECTS') ||
     code.includes('PROBLEMS') ||
     code.includes('ACCESSORIES') ||
     title.includes('select all') ||
     subtitle.includes('select all') ||
+    title.includes('physical') ||
+    subtitle.includes('physical') ||
+    title.includes('condition') ||
+    subtitle.includes('condition') ||
     title.includes('functional') ||
     subtitle.includes('functional') ||
     title.includes('problems') ||
     subtitle.includes('problems') ||
     title.includes('issues') ||
     subtitle.includes('issues') ||
+    title.includes('defects') ||
+    subtitle.includes('defects') ||
+    title.includes('screen') ||
+    title.includes('body') ||
     title.includes('accessories') ||
     subtitle.includes('accessories')
   );

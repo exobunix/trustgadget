@@ -183,16 +183,19 @@ export function calculateValuation(
 
   let finalPrice = basePrice + sumAdditions - totalDeductions;
 
-  if (isRejected) {
+  if (isRejected || sumPercentageDeductions >= 100 || totalDeductions >= (basePrice + sumAdditions)) {
     finalPrice = 0;
-    ruleAuditLog.push(`[FINAL] Device Rejected (₹0) - ${rejectionReason}`);
-  } else {
-    // Floor at ₹0
-    if (finalPrice < 0) {
-      finalPrice = 0;
-      ruleAuditLog.push(`[FLOOR] Final price capped to minimum ₹0`);
+    if (isRejected) {
+      ruleAuditLog.push(`[FINAL] Device Rejected (₹0) - ${rejectionReason}`);
+    } else {
+      ruleAuditLog.push(`[FINAL] Total deductions (${sumPercentageDeductions}%) exceed base price. Final price set to ₹0`);
     }
+  } else if (finalPrice < 0) {
+    finalPrice = 0;
+    ruleAuditLog.push(`[FLOOR] Final price capped to minimum ₹0`);
   }
+
+  finalPrice = Math.max(0, Math.round(finalPrice));
 
   ruleAuditLog.push(
     `[SUMMARY] Base: ₹${basePrice.toLocaleString('en-IN')} | Total %: ${sumPercentageDeductions}% (-₹${percentageDeductionAmount.toLocaleString('en-IN')}) | Fixed Deductions: -₹${sumFixedDeductions.toLocaleString('en-IN')} | Total Deductions: -₹${totalDeductions.toLocaleString('en-IN')} | Final: ₹${finalPrice.toLocaleString('en-IN')}`

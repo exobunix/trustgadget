@@ -79,10 +79,38 @@ export default function ModelValuationPage() {
         return { ...prev, [q.code]: [ans.code] };
       }
 
-      if (current.includes(ans.code)) {
-        return { ...prev, [q.code]: current.filter((c) => c !== ans.code) };
+      const isNoDefect =
+        ans.code === 'PERFECT' ||
+        ans.code === 'FLAWLESS' ||
+        ans.code === 'NO_DEFECTS' ||
+        ans.label.toLowerCase().includes('no physical defects') ||
+        ans.label.toLowerCase().includes('no defects') ||
+        ans.label.toLowerCase().includes('flawless');
+
+      if (isNoDefect) {
+        if (current.includes(ans.code)) {
+          return { ...prev, [q.code]: [] };
+        } else {
+          return { ...prev, [q.code]: [ans.code] };
+        }
       } else {
-        return { ...prev, [q.code]: [...current, ans.code] };
+        const filteredCurrent = current.filter((c) => {
+          const matchAns = q.answers?.find((a: any) => a.code === c);
+          const isAnsNoDefect =
+            c === 'PERFECT' ||
+            c === 'FLAWLESS' ||
+            c === 'NO_DEFECTS' ||
+            matchAns?.label?.toLowerCase().includes('no physical defects') ||
+            matchAns?.label?.toLowerCase().includes('no defects') ||
+            matchAns?.label?.toLowerCase().includes('flawless');
+          return !isAnsNoDefect;
+        });
+
+        if (filteredCurrent.includes(ans.code)) {
+          return { ...prev, [q.code]: filteredCurrent.filter((c) => c !== ans.code) };
+        } else {
+          return { ...prev, [q.code]: [...filteredCurrent, ans.code] };
+        }
       }
     });
   };
@@ -123,6 +151,21 @@ export default function ModelValuationPage() {
   const handleProceedToCheckout = () => {
     if (!valuationResult || !model) return;
 
+    // Prepare human-readable enriched conditions
+    const enrichedConditions = questions.map((q) => {
+      const selectedCodes = answers[q.code] || [];
+      const selectedLabels = selectedCodes.map((code) => {
+        const matchedAns = q.answers?.find((a: any) => a.code === code);
+        return matchedAns?.label || code;
+      });
+      return {
+        questionCode: q.code,
+        questionTitle: q.title,
+        selectedCodes,
+        selectedLabels,
+      };
+    }).filter((item) => item.selectedCodes.length > 0);
+
     const checkoutData = {
       modelId: model.id,
       variantId: selectedVariant?.id || '',
@@ -131,10 +174,11 @@ export default function ModelValuationPage() {
       modelName: model.name,
       variantName: selectedVariant?.name || 'Standard',
       deviceImageUrl: model.imageUrl || '',
-      basePrice: valuationResult.basePrice,
-      estimatedPrice: valuationResult.estimatedPrice,
+      basePrice: selectedVariant?.basePrice ?? model.basePrice,
+      estimatedPrice: Math.max(0, valuationResult.estimatedPrice),
       sessionToken: valuationResult.sessionToken || '',
-      conditionSummary: answers,
+      conditionSummary: enrichedConditions.length > 0 ? enrichedConditions : answers,
+      answers,
     };
 
     if (typeof window !== 'undefined') {
@@ -351,7 +395,7 @@ export default function ModelValuationPage() {
             </span>
             <h2 className="text-sm text-slate-400 mt-2">Your Estimated Selling Price</h2>
             <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-emerald-300 my-2">
-              ₹{valuationResult.estimatedPrice.toLocaleString('en-IN')}
+              ₹{Math.max(0, valuationResult.estimatedPrice).toLocaleString('en-IN')}
             </div>
 
             {valuationResult.isRejected && (

@@ -19,12 +19,23 @@ export async function GET(
     const history = db.prepare('SELECT * FROM order_status_history WHERE orderId = ? ORDER BY createdAt ASC').all(order.id);
     const verification = db.prepare('SELECT * FROM verification_records WHERE orderId = ?').get(order.id) as any;
 
+    let parsedCondition: any = {};
+    try {
+      parsedCondition = order.conditionSummary ? JSON.parse(order.conditionSummary) : {};
+    } catch {
+      parsedCondition = order.conditionSummary;
+    }
+
+    const { resolveOrderConditions } = await import('@/lib/order-condition-formatter');
+    const resolvedConditions = resolveOrderConditions(order.conditionSummary);
+
     return NextResponse.json(
       {
         success: true,
         data: {
           ...order,
-          conditionSummary: order.conditionSummary ? JSON.parse(order.conditionSummary) : {},
+          conditionSummary: parsedCondition,
+          resolvedConditions,
           statusHistory: history,
           verificationRecord: verification ? {
             ...verification,

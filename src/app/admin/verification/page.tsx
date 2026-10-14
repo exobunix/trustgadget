@@ -184,21 +184,55 @@ function VerificationStudioContent() {
                 <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5" /> Customer Declared Answers
                 </h3>
-                <div className="space-y-2 text-slate-300">
-                  {selectedOrder.conditionSummary ? (
-                    typeof selectedOrder.conditionSummary === 'string' ? (
-                      <pre className="text-[10px] text-slate-400 whitespace-pre-wrap">{selectedOrder.conditionSummary}</pre>
-                    ) : (
-                      Object.entries(selectedOrder.conditionSummary).map(([k, v]) => (
-                        <div key={k} className="flex justify-between py-1 border-b border-slate-800/60">
-                          <span className="text-slate-400">{k.replace('PHONE_', '').replace('LAPTOP_', '')}</span>
-                          <span className="font-semibold text-white">{String(v)}</span>
+                <div className="space-y-2.5 text-slate-300 max-h-72 overflow-y-auto pr-1">
+                  {(() => {
+                    const conditions = selectedOrder.resolvedConditions && selectedOrder.resolvedConditions.length > 0
+                      ? selectedOrder.resolvedConditions
+                      : (() => {
+                          try {
+                            const raw = typeof selectedOrder.conditionSummary === 'string'
+                              ? JSON.parse(selectedOrder.conditionSummary)
+                              : selectedOrder.conditionSummary;
+                            if (Array.isArray(raw) && raw.length > 0 && (raw[0].selectedLabels || raw[0].questionTitle)) {
+                              return raw;
+                            }
+                            if (typeof raw === 'object' && raw !== null) {
+                              return Object.entries(raw).map(([k, v]) => ({
+                                questionCode: k,
+                                questionTitle: k.replace(/^PHONE_/, '').replace(/^LAPTOP_/, '').replace(/^SMARTPHONE_/, '').replace(/_/g, ' '),
+                                selectedLabels: Array.isArray(v) ? v.map(String) : [String(v)],
+                              }));
+                            }
+                          } catch {}
+                          return null;
+                        })();
+
+                    if (!conditions || conditions.length === 0) {
+                      return <div className="text-slate-500 italic">No declared diagnostic summary stored.</div>;
+                    }
+
+                    return conditions.map((item: any, idx: number) => {
+                      const labels: string[] = item.selectedLabels || item.selectedAnswers?.map((a: any) => a.label) || [];
+                      return (
+                        <div key={idx} className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                          <div className="text-[11px] font-bold text-white capitalize flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                            {item.questionTitle || item.questionCode}
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {labels.map((lbl: string, lIdx: number) => (
+                              <span
+                                key={lIdx}
+                                className="px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-950 text-cyan-300 border border-cyan-500/30"
+                              >
+                                {lbl}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      ))
-                    )
-                  ) : (
-                    <div className="text-slate-500 italic">No declared diagnostic summary stored.</div>
-                  )}
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 

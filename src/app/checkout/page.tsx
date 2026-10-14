@@ -86,10 +86,13 @@ export default function CheckoutPage() {
                   const currentBasePrice = liveVariant?.basePrice || liveModel.basePrice;
                   if (currentBasePrice && currentBasePrice !== parsed.basePrice) {
                     const priceDiff = currentBasePrice - parsed.basePrice;
+                    const effectivePrice = parsed.estimatedPrice !== undefined && parsed.estimatedPrice !== null
+                      ? Math.max(0, parsed.estimatedPrice + priceDiff)
+                      : currentBasePrice;
                     const updated = {
                       ...parsed,
                       basePrice: currentBasePrice,
-                      estimatedPrice: Math.max(500, (parsed.estimatedPrice || currentBasePrice) + priceDiff),
+                      estimatedPrice: Math.max(0, effectivePrice),
                     };
                     setOrderSummary(updated);
                     sessionStorage.setItem('tmg_checkout_order', JSON.stringify(updated));
