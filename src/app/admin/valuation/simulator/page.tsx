@@ -13,6 +13,7 @@ import {
   Laptop,
   ArrowRight,
 } from 'lucide-react';
+import { isMultiChoiceQuestion } from '@/lib/question-targeting';
 
 export default function AdminValuationSimulatorPage() {
   const [categories, setCategories] = useState<any[]>([]);
@@ -28,7 +29,7 @@ export default function AdminValuationSimulatorPage() {
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
 
   const [questions, setQuestions] = useState<any[]>([]);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string[]>>({});
 
   const [simulationResult, setSimulationResult] = useState<any>(null);
   const [calculating, setCalculating] = useState(false);
@@ -94,10 +95,14 @@ export default function AdminValuationSimulatorPage() {
       }
       if (qData.success) {
         setQuestions(qData.data);
-        const initialAnswers: Record<string, string> = {};
+        const initialAnswers: Record<string, string[]> = {};
         qData.data.forEach((q: any) => {
           if (q.answers && q.answers.length > 0) {
-            initialAnswers[q.code] = q.answers[0].code;
+            if (isMultiChoiceQuestion(q)) {
+              initialAnswers[q.code] = [];
+            } else {
+              initialAnswers[q.code] = [q.answers[0].code];
+            }
           }
         });
         setAnswers(initialAnswers);
@@ -110,10 +115,12 @@ export default function AdminValuationSimulatorPage() {
     if (!selectedModel) return;
     setCalculating(true);
     try {
-      const answersPayload = Object.entries(answers).map(([questionCode, answerCode]) => ({
-        questionCode,
-        answerCode,
-      }));
+      const answersPayload = Object.entries(answers).flatMap(([questionCode, selectedList]) => {
+        if (Array.isArray(selectedList)) {
+          return selectedList.map((answerCode) => ({ questionCode, answerCode }));
+        }
+        return selectedList ? [{ questionCode, answerCode: selectedList }] : [];
+      });
 
       const res = await fetch('/api/valuation/calculate', {
         method: 'POST',
@@ -276,12 +283,27 @@ export default function AdminValuationSimulatorPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                   {q.answers.map((ans: any) => {
-                    const isSelected = answers[q.code] === ans.code;
+                    const isMulti = isMultiChoiceQuestion(q);
+                    const selectedList = answers[q.code] || [];
+                    const isSelected = selectedList.includes(ans.code);
+
                     return (
                       <button
                         key={ans.id}
                         type="button"
-                        onClick={() => setAnswers((prev) => ({ ...prev, [q.code]: ans.code }))}
+                        onClick={() => {
+                          setAnswers((prev) => {
+                            const cur = prev[q.code] || [];
+                            if (!isMulti) {
+                              return { ...prev, [q.code]: [ans.code] };
+                            }
+                            if (cur.includes(ans.code)) {
+                              return { ...prev, [q.code]: cur.filter((c) => c !== ans.code) };
+                            } else {
+                              return { ...prev, [q.code]: [...cur, ans.code] };
+                            }
+                          });
+                        }}
                         className={`p-3 rounded-xl border text-left text-xs transition-all ${
                           isSelected
                             ? 'border-cyan-500 bg-cyan-950/40 text-cyan-200 ring-1 ring-cyan-500/40 font-semibold'

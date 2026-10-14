@@ -32,6 +32,7 @@ import {
   AlertTriangle,
   Zap,
 } from 'lucide-react';
+import { isMultiChoiceQuestion } from '@/lib/question-targeting';
 
 interface Category {
   id: string;
@@ -126,7 +127,7 @@ function SellPageContent() {
 
   // Diagnostic Questions
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
 
   // Coupon State
@@ -253,10 +254,12 @@ function SellPageContent() {
       return;
     }
 
-    const answersPayload = Object.entries(answers).map(([questionCode, answerCode]) => ({
-      questionCode,
-      answerCode,
-    }));
+    const answersPayload = Object.entries(answers).flatMap(([questionCode, val]) => {
+      if (Array.isArray(val)) {
+        return val.map((answerCode) => ({ questionCode, answerCode }));
+      }
+      return val ? [{ questionCode, answerCode: val }] : [];
+    });
 
     async function calculate() {
       try {
@@ -648,7 +651,7 @@ function SellPageContent() {
               {/* Progress Step Pills (Screenshot 5 Match: ✓ 1 ✓ 2 ✓ 3 4 5...) */}
               <div className="flex items-center gap-1.5 overflow-x-auto pb-2">
                 {questions.map((q, idx) => {
-                  const isAnswered = !!answers[q.code];
+                  const isAnswered = (answers[q.code] || []).length > 0;
                   const isCurrent = idx === currentQuestionIdx;
                   return (
                     <button
@@ -672,11 +675,20 @@ function SellPageContent() {
               {(() => {
                 const currentQ = questions[currentQuestionIdx];
                 if (!currentQ) return null;
+                const isMulti = isMultiChoiceQuestion(currentQ);
+                const selectedCodes = answers[currentQ.code] || [];
 
                 return (
                   <div className="space-y-4 pt-2">
                     <div>
-                      <h3 className="text-xl font-extrabold text-white">{currentQ.title}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-extrabold text-white">{currentQ.title}</h3>
+                        {isMulti && (
+                          <span className="text-xs font-semibold text-emerald-400 bg-emerald-950/80 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                            Select all that apply
+                          </span>
+                        )}
+                      </div>
                       {currentQ.subtitle && (
                         <p className="text-xs text-slate-400 mt-1">{currentQ.subtitle}</p>
                       )}
@@ -686,16 +698,27 @@ function SellPageContent() {
                     {/* Answer Option Cards Grid (Zero Deductions Disclosed) */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
                       {currentQ.answers.map((ans) => {
-                        const isSelected = answers[currentQ.code] === ans.code;
+                        const isSelected = selectedCodes.includes(ans.code);
 
                         return (
                           <button
                             key={ans.id}
                             type="button"
                             onClick={() => {
-                              setAnswers((prev) => ({ ...prev, [currentQ.code]: ans.code }));
-                              if (currentQuestionIdx < questions.length - 1) {
-                                setCurrentQuestionIdx(currentQuestionIdx + 1);
+                              if (!isMulti) {
+                                setAnswers((prev) => ({ ...prev, [currentQ.code]: [ans.code] }));
+                                if (currentQuestionIdx < questions.length - 1) {
+                                  setCurrentQuestionIdx(currentQuestionIdx + 1);
+                                }
+                              } else {
+                                setAnswers((prev) => {
+                                  const cur = prev[currentQ.code] || [];
+                                  if (cur.includes(ans.code)) {
+                                    return { ...prev, [currentQ.code]: cur.filter((c) => c !== ans.code) };
+                                  } else {
+                                    return { ...prev, [currentQ.code]: [...cur, ans.code] };
+                                  }
+                                });
                               }
                             }}
                             className={`p-5 rounded-2xl border text-center transition-all flex flex-col items-center justify-center space-y-2.5 group ${
@@ -808,18 +831,18 @@ function SellPageContent() {
                     <div className="flex items-center justify-between text-xs text-slate-400">
                       <span>Condition Evaluation</span>
                       <span className="font-mono font-bold text-cyan-400">
-                        {Object.keys(answers).length} of {questions.length} Answered
+                        {questions.filter((q) => (answers[q.code] || []).length > 0).length} of {questions.length} Answered
                       </span>
                     </div>
                     <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
                       <div
                         className="bg-gradient-to-r from-cyan-400 to-emerald-400 h-full transition-all duration-300"
                         style={{
-                          width: `${questions.length > 0 ? (Object.keys(answers).length / questions.length) * 100 : 0}%`,
+                          width: `${questions.length > 0 ? (questions.filter((q) => (answers[q.code] || []).length > 0).length / questions.length) * 100 : 0}%`,
                         }}
                       />
                     </div>
-                    {Object.keys(answers).length === questions.length ? (
+                    {questions.filter((q) => (answers[q.code] || []).length > 0).length === questions.length ? (
                       <div className="text-[11px] text-emerald-400 flex items-center gap-1.5 font-semibold pt-0.5">
                         <Check className="w-3.5 h-3.5 stroke-[3]" /> All functional parameters evaluated
                       </div>

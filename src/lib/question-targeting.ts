@@ -151,3 +151,35 @@ export function isQuestionApplicable(question: QuestionTargetLike, device: Devic
       return true;
   }
 }
+
+/**
+ * Determines whether a question allows multiple choices / simultaneous selections.
+ */
+export function isMultiChoiceQuestion(question: any): boolean {
+  if (!question) return false;
+  const qType = (question.questionType || '').toUpperCase();
+  if (qType === 'MULTI_CHOICE' || qType === 'MULTI' || qType === 'CHECKBOX') {
+    return true;
+  }
+  const code = (question.code || '').toUpperCase();
+  const title = (question.title || '').toLowerCase();
+  const subtitle = (question.subtitle || '').toLowerCase();
+
+  return (
+    code.includes('FUNCTIONAL') ||
+    code.includes('ISSUES') ||
+    code.includes('DEFECTS') ||
+    code.includes('PROBLEMS') ||
+    code.includes('ACCESSORIES') ||
+    title.includes('select all') ||
+    subtitle.includes('select all') ||
+    title.includes('functional') ||
+    subtitle.includes('functional') ||
+    title.includes('problems') ||
+    subtitle.includes('problems') ||
+    title.includes('issues') ||
+    subtitle.includes('issues') ||
+    title.includes('accessories') ||
+    subtitle.includes('accessories')
+  );
+}

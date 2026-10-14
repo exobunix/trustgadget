@@ -14,6 +14,7 @@ import {
   Smartphone,
   Laptop,
 } from 'lucide-react';
+import { isMultiChoiceQuestion } from '@/lib/question-targeting';
 
 export default function ModelValuationPage() {
   const params = useParams();
@@ -26,7 +27,7 @@ export default function ModelValuationPage() {
   const [variants, setVariants] = useState<any[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [questions, setQuestions] = useState<any[]>([]);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [valuationResult, setValuationResult] = useState<any>(null);
   const [step, setStep] = useState<'VARIANT' | 'QUESTIONS' | 'RESULT'>('VARIANT');
   const [loading, setLoading] = useState(true);
@@ -48,10 +49,14 @@ export default function ModelValuationPage() {
           const qData = await qRes.json();
           if (qData.success) {
             setQuestions(qData.data);
-            const initial: Record<string, string> = {};
+            const initial: Record<string, string[]> = {};
             qData.data.forEach((q: any) => {
               if (q.answers && q.answers.length > 0) {
-                initial[q.code] = q.answers[0].code;
+                if (isMultiChoiceQuestion(q)) {
+                  initial[q.code] = [];
+                } else {
+                  initial[q.code] = [q.answers[0].code];
+                }
               }
             });
             setAnswers(initial);
@@ -66,14 +71,32 @@ export default function ModelValuationPage() {
     load();
   }, [modelSlug]);
 
+  const toggleAnswer = (q: any, ans: any) => {
+    const isMulti = isMultiChoiceQuestion(q);
+    setAnswers((prev) => {
+      const current = prev[q.code] || [];
+      if (!isMulti) {
+        return { ...prev, [q.code]: [ans.code] };
+      }
+
+      if (current.includes(ans.code)) {
+        return { ...prev, [q.code]: current.filter((c) => c !== ans.code) };
+      } else {
+        return { ...prev, [q.code]: [...current, ans.code] };
+      }
+    });
+  };
+
   const handleCalculate = async () => {
     if (!model) return;
     setCalculating(true);
     try {
-      const answersPayload = Object.entries(answers).map(([questionCode, answerCode]) => ({
-        questionCode,
-        answerCode,
-      }));
+      const answersPayload = Object.entries(answers).flatMap(([questionCode, selectedList]) => {
+        if (Array.isArray(selectedList)) {
+          return selectedList.map((answerCode) => ({ questionCode, answerCode }));
+        }
+        return selectedList ? [{ questionCode, answerCode: selectedList }] : [];
+      });
 
       const res = await fetch('/api/valuation/calculate', {
         method: 'POST',
@@ -231,48 +254,72 @@ export default function ModelValuationPage() {
           </div>
 
           <div className="space-y-6">
-            {questions.map((q, idx) => (
-              <div key={q.id} className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4 glass-panel">
-                <div className="flex items-start gap-3">
-                  <span className="w-6 h-6 rounded-full bg-cyan-950 border border-cyan-500/30 text-cyan-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                    {idx + 1}
-                  </span>
-                  <div>
-                    <h3 className="text-sm font-bold text-white">{q.title}</h3>
-                    {q.subtitle && <p className="text-xs text-slate-400 mt-0.5">{q.subtitle}</p>}
+            {questions.map((q, idx) => {
+              const isMulti = isMultiChoiceQuestion(q);
+              const selectedCodes = answers[q.code] || [];
+
+              return (
+                <div key={q.id} className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4 glass-panel">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <span className="w-6 h-6 rounded-full bg-cyan-950 border border-cyan-500/30 text-cyan-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                        {idx + 1}
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold text-white">{q.title}</h3>
+                          {isMulti && (
+                            <span className="text-[10px] font-semibold text-cyan-400 bg-cyan-950/80 border border-cyan-500/30 px-2.5 py-0.5 rounded-full">
+                              Select all that apply
+                            </span>
+                          )}
+                        </div>
+                        {q.subtitle && <p className="text-xs text-slate-400 mt-0.5">{q.subtitle}</p>}
+                      </div>
+                    </div>
+                    {isMulti && selectedCodes.length > 0 && (
+                      <span className="text-[11px] font-mono font-bold text-cyan-400 bg-cyan-950/60 px-2.5 py-1 rounded-lg border border-cyan-500/20 shrink-0">
+                        {selectedCodes.length} selected
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {q.answers.map((ans: any) => {
+                      const isSelected = selectedCodes.includes(ans.code);
+                      return (
+                        <button
+                          key={ans.id}
+                          type="button"
+                          onClick={() => toggleAnswer(q, ans)}
+                          className={`p-4 rounded-xl border text-left transition-all ${
+                            isSelected
+                              ? 'border-cyan-500 bg-cyan-950/40 ring-1 ring-cyan-500/30 text-white shadow-lg shadow-cyan-500/10'
+                              : 'border-slate-800 bg-slate-950/60 text-slate-300 hover:border-slate-700 hover:bg-slate-900/50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold">{ans.label}</span>
+                            {isSelected ? (
+                              <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
+                            ) : isMulti ? (
+                              <span className="w-4 h-4 rounded-md border border-slate-700 block shrink-0" />
+                            ) : null}
+                          </div>
+                          {ans.description && <p className="text-[11px] text-slate-400 mt-1">{ans.description}</p>}
+                          {ans.isRejection && (
+                            <div className="mt-2 text-[10px] text-rose-400 bg-rose-950/40 px-2 py-0.5 rounded border border-rose-500/20 flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3 shrink-0" />
+                              <span>Device rejection policy</span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  {q.answers.map((ans: any) => {
-                    const isSelected = answers[q.code] === ans.code;
-                    return (
-                      <button
-                        key={ans.id}
-                        onClick={() => setAnswers((prev) => ({ ...prev, [q.code]: ans.code }))}
-                        className={`p-4 rounded-xl border text-left transition-all ${
-                          isSelected
-                            ? 'border-cyan-500 bg-cyan-950/40 ring-1 ring-cyan-500/30 text-white'
-                            : 'border-slate-800 bg-slate-950/60 text-slate-300 hover:border-slate-700'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold">{ans.label}</span>
-                          {isSelected && <CheckCircle2 className="w-4 h-4 text-cyan-400" />}
-                        </div>
-                        {ans.description && <p className="text-[11px] text-slate-400 mt-1">{ans.description}</p>}
-                        {ans.isRejection && (
-                          <div className="mt-2 text-[10px] text-rose-400 bg-rose-950/40 px-2 py-0.5 rounded border border-rose-500/20 flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3 shrink-0" />
-                            <span>Device rejection policy</span>
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="pt-4 flex justify-end">

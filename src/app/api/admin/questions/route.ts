@@ -211,6 +211,7 @@ export async function PUT(request: NextRequest) {
       categoryId,
       targetCategory,
       code,
+      questionType,
       isActive,
       displayOrder,
       answers,
@@ -264,6 +265,7 @@ export async function PUT(request: NextRequest) {
                 categoryId = ?,
                 targetCategory = ?,
                 code = COALESCE(?, code),
+                questionType = COALESCE(?, questionType),
                 isActive = COALESCE(?, isActive),
                 displayOrder = COALESCE(?, displayOrder),
                 updatedAt = CURRENT_TIMESTAMP
@@ -274,6 +276,7 @@ export async function PUT(request: NextRequest) {
             safeCategoryId,
             normalizedTarget,
             code || null,
+            questionType || null,
             isActive !== undefined ? (isActive ? 1 : 0) : 1,
             displayOrder !== undefined ? displayOrder : 0,
             id
@@ -283,7 +286,7 @@ export async function PUT(request: NextRequest) {
             INSERT OR REPLACE INTO questions (
               id, categoryId, targetCategory, title, subtitle, code,
               questionType, isRequired, displayOrder, isActive, updatedAt
-            ) VALUES (?, ?, ?, ?, ?, ?, 'SINGLE_CHOICE', 1, ?, ?, CURRENT_TIMESTAMP)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, CURRENT_TIMESTAMP)
           `).run(
             id,
             safeCategoryId,
@@ -291,6 +294,7 @@ export async function PUT(request: NextRequest) {
             title,
             subtitle || null,
             code || `Q_${Date.now()}`,
+            questionType || 'SINGLE_CHOICE',
             displayOrder !== undefined ? displayOrder : 0,
             isActive !== undefined ? (isActive ? 1 : 0) : 1
           );
@@ -338,6 +342,7 @@ export async function PUT(request: NextRequest) {
         categoryId: categoryId || null,
         targetCategory: normalizedTarget,
         code: code || null,
+        questionType: questionType || 'SINGLE_CHOICE',
         isActive: isActive !== false,
         displayOrder: displayOrder ?? 0,
       },

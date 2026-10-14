@@ -108,6 +108,7 @@ export default function AdminPricingEnginePage() {
         categoryId: q.categoryId || null,
         targetCategory: q.targetCategory || 'ALL',
         code: q.code,
+        questionType: q.questionType || 'SINGLE_CHOICE',
         isActive: q.isActive,
         displayOrder: q.displayOrder,
         answers: q.answers,
@@ -396,6 +397,19 @@ export default function AdminPricingEnginePage() {
                               {opt.label}
                             </option>
                           ))}
+                        </select>
+                      </div>
+
+                      <span className="text-slate-600">•</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-slate-400">Mode:</span>
+                        <select
+                          value={q.questionType || 'SINGLE_CHOICE'}
+                          onChange={(e) => handleUpdateQuestionField(qIndex, 'questionType', e.target.value)}
+                          className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-0.5 text-xs font-bold text-cyan-400 focus:outline-none focus:border-cyan-400 cursor-pointer"
+                        >
+                          <option value="SINGLE_CHOICE">Single Choice (1 Option)</option>
+                          <option value="MULTI_CHOICE">Multiple Choice (Multiple Options)</option>
                         </select>
                       </div>
 
