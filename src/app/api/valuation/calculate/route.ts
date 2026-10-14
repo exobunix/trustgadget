@@ -15,6 +15,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'answers array is required' }, { status: 400 });
     }
 
+    // Ensure questions and pricing rules from MongoDB are synced into SQLite cache
+    try {
+      const { syncMongoQuestionsToSqlite, syncMongoPricingRulesToSqlite } = await import('@/lib/mongo-catalog');
+      await syncMongoQuestionsToSqlite(db);
+      await syncMongoPricingRulesToSqlite(db);
+    } catch (_) {}
+
     const result = calculateValuation(modelId, variantId || null, answers);
 
     // Record valuation session in DB

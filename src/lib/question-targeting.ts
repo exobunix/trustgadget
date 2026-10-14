@@ -84,9 +84,18 @@ export function isQuestionApplicable(question: QuestionTargetLike, device: Devic
 
   const target = normalizeTargetCategory(question.targetCategory, question.categoryId, question.code);
 
-  const isSmartphone = device.categoryId === 'cat_smartphone' || device.categorySlug === 'smartphones';
-  const isLaptop = device.categoryId === 'cat_laptop' || device.categorySlug === 'laptops';
-  const isTablet = device.categoryId === 'cat_tablet' || device.categorySlug === 'tablets';
+  const isSmartphone =
+    device.categoryId === 'cat_smartphone' ||
+    device.categoryId === 'smartphones' ||
+    device.categorySlug === 'smartphones';
+  const isLaptop =
+    device.categoryId === 'cat_laptop' ||
+    device.categoryId === 'laptops' ||
+    device.categorySlug === 'laptops';
+  const isTablet =
+    device.categoryId === 'cat_tablet' ||
+    device.categoryId === 'tablets' ||
+    device.categorySlug === 'tablets';
 
   const brandName = (device.brandName || '').toLowerCase();
   const brandId = (device.brandId || '').toLowerCase();

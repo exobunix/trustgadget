@@ -101,46 +101,60 @@ export async function POST(request: NextRequest) {
         }))
       : [];
 
-    // 1. Write to SQLite
-    const transaction = db.transaction(() => {
-      db.prepare(`
-        INSERT INTO questions (id, categoryId, targetCategory, brandId, modelId, title, subtitle, code, questionType, isRequired, displayOrder, isActive)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 1)
-      `).run(
-        questionId,
-        categoryId || null,
-        normalizedTarget,
-        brandId || null,
-        modelId || null,
-        title,
-        subtitle || null,
-        code,
-        questionType || 'SINGLE_CHOICE',
-        displayOrder || 0
-      );
-
-      const insertAns = db.prepare(`
-        INSERT INTO answers (id, questionId, code, label, description, adjustmentType, adjustmentValue, isRejection, warningMessage, displayOrder, isActive)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-      `);
-
-      for (const ans of processedAnswers) {
-        insertAns.run(
-          ans.id,
-          questionId,
-          ans.code,
-          ans.label,
-          ans.description,
-          ans.adjustmentType,
-          ans.adjustmentValue,
-          ans.isRejection ? 1 : 0,
-          ans.warningMessage,
-          ans.displayOrder
-        );
+    // 1. Safe write to SQLite cache
+    try {
+      let safeCategoryId = categoryId || null;
+      if (safeCategoryId) {
+        try {
+          const cat = db.prepare('SELECT id FROM categories WHERE id = ?').get(safeCategoryId);
+          if (!cat) safeCategoryId = null;
+        } catch (_) {
+          safeCategoryId = null;
+        }
       }
-    });
 
-    transaction();
+      const transaction = db.transaction(() => {
+        db.prepare(`
+          INSERT OR REPLACE INTO questions (id, categoryId, targetCategory, brandId, modelId, title, subtitle, code, questionType, isRequired, displayOrder, isActive, updatedAt)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 1, CURRENT_TIMESTAMP)
+        `).run(
+          questionId,
+          safeCategoryId,
+          normalizedTarget,
+          brandId || null,
+          modelId || null,
+          title,
+          subtitle || null,
+          code,
+          questionType || 'SINGLE_CHOICE',
+          displayOrder || 0
+        );
+
+        const insertAns = db.prepare(`
+          INSERT OR REPLACE INTO answers (id, questionId, code, label, description, adjustmentType, adjustmentValue, isRejection, warningMessage, displayOrder, isActive, updatedAt)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+        `);
+
+        for (const ans of processedAnswers) {
+          insertAns.run(
+            ans.id,
+            questionId,
+            ans.code,
+            ans.label,
+            ans.description,
+            ans.adjustmentType,
+            ans.adjustmentValue,
+            ans.isRejection ? 1 : 0,
+            ans.warningMessage,
+            ans.displayOrder
+          );
+        }
+      });
+
+      transaction();
+    } catch (sqliteErr: any) {
+      console.warn('[POST /api/admin/questions] SQLite write warning:', sqliteErr.message);
+    }
 
     // 2. Persist to MongoDB (authoritative)
     await mongoUpsertQuestion(
@@ -209,57 +223,111 @@ export async function PUT(request: NextRequest) {
 
     const normalizedTarget = normalizeTargetCategory(targetCategory, categoryId, code);
 
-    // 1. Update SQLite
-    const transaction = db.transaction(() => {
-      db.prepare(`
-        UPDATE questions
-        SET title = ?,
-            subtitle = ?,
-            categoryId = ?,
-            targetCategory = ?,
-            code = COALESCE(?, code),
-            isActive = COALESCE(?, isActive),
-            displayOrder = COALESCE(?, displayOrder),
-            updatedAt = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(
-        title,
-        subtitle || null,
-        categoryId || null,
-        normalizedTarget,
-        code || null,
-        isActive !== undefined ? (isActive ? 1 : 0) : null,
-        displayOrder !== undefined ? displayOrder : null,
-        id
-      );
+    // Prepare processed answers
+    const processedAnswers = Array.isArray(answers)
+      ? answers.map((ans: any, idx: number) => ({
+          id: ans.id && !ans.id.startsWith('ans_temp_')
+            ? ans.id
+            : `ans_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+          questionId: id,
+          code: ans.code || `ANS_${idx + 1}`,
+          label: ans.label || 'Choice',
+          description: ans.description || null,
+          adjustmentType: ans.adjustmentType || 'FIXED',
+          adjustmentValue: Number(ans.adjustmentValue) || 0,
+          isRejection: Boolean(ans.isRejection),
+          warningMessage: ans.warningMessage || null,
+          displayOrder: idx + 1,
+          isActive: ans.isActive !== false,
+        }))
+      : [];
 
-      // If full answers array provided, reconcile answers in SQLite
-      if (Array.isArray(answers) && answers.length > 0) {
-        db.prepare('DELETE FROM answers WHERE questionId = ?').run(id);
-        const insertAns = db.prepare(`
-          INSERT INTO answers (id, questionId, code, label, description, adjustmentType, adjustmentValue, isRejection, warningMessage, displayOrder, isActive)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-        `);
-
-        answers.forEach((ans: any, idx: number) => {
-          const ansId = ans.id && !ans.id.startsWith('ans_temp_') ? ans.id : `ans_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`;
-          insertAns.run(
-            ansId,
-            id,
-            ans.code || `ANS_${idx + 1}`,
-            ans.label,
-            ans.description || null,
-            ans.adjustmentType || 'FIXED',
-            Number(ans.adjustmentValue) || 0,
-            ans.isRejection ? 1 : 0,
-            ans.warningMessage || null,
-            idx + 1
-          );
-        });
+    // 1. Safe update/upsert to SQLite cache
+    try {
+      let safeCategoryId = categoryId || null;
+      if (safeCategoryId) {
+        try {
+          const cat = db.prepare('SELECT id FROM categories WHERE id = ?').get(safeCategoryId);
+          if (!cat) safeCategoryId = null;
+        } catch (_) {
+          safeCategoryId = null;
+        }
       }
-    });
 
-    transaction();
+      const transaction = db.transaction(() => {
+        const existingQ = db.prepare('SELECT id FROM questions WHERE id = ?').get(id) as any;
+        if (existingQ) {
+          db.prepare(`
+            UPDATE questions
+            SET title = ?,
+                subtitle = ?,
+                categoryId = ?,
+                targetCategory = ?,
+                code = COALESCE(?, code),
+                isActive = COALESCE(?, isActive),
+                displayOrder = COALESCE(?, displayOrder),
+                updatedAt = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(
+            title,
+            subtitle || null,
+            safeCategoryId,
+            normalizedTarget,
+            code || null,
+            isActive !== undefined ? (isActive ? 1 : 0) : 1,
+            displayOrder !== undefined ? displayOrder : 0,
+            id
+          );
+        } else {
+          db.prepare(`
+            INSERT OR REPLACE INTO questions (
+              id, categoryId, targetCategory, title, subtitle, code,
+              questionType, isRequired, displayOrder, isActive, updatedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, 'SINGLE_CHOICE', 1, ?, ?, CURRENT_TIMESTAMP)
+          `).run(
+            id,
+            safeCategoryId,
+            normalizedTarget,
+            title,
+            subtitle || null,
+            code || `Q_${Date.now()}`,
+            displayOrder !== undefined ? displayOrder : 0,
+            isActive !== undefined ? (isActive ? 1 : 0) : 1
+          );
+        }
+
+        // If answers provided, reconcile in SQLite
+        if (processedAnswers.length > 0) {
+          db.prepare('DELETE FROM answers WHERE questionId = ?').run(id);
+          const insertAns = db.prepare(`
+            INSERT OR REPLACE INTO answers (
+              id, questionId, code, label, description, adjustmentType,
+              adjustmentValue, isRejection, warningMessage, displayOrder, isActive, updatedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          `);
+
+          processedAnswers.forEach((ans) => {
+            insertAns.run(
+              ans.id,
+              id,
+              ans.code,
+              ans.label,
+              ans.description,
+              ans.adjustmentType,
+              ans.adjustmentValue,
+              ans.isRejection ? 1 : 0,
+              ans.warningMessage,
+              ans.displayOrder,
+              ans.isActive ? 1 : 0
+            );
+          });
+        }
+      });
+
+      transaction();
+    } catch (sqliteErr: any) {
+      console.warn('[PUT /api/admin/questions] SQLite write warning:', sqliteErr.message);
+    }
 
     // 2. Persist to MongoDB (authoritative)
     await mongoUpsertQuestion(
@@ -273,7 +341,7 @@ export async function PUT(request: NextRequest) {
         isActive: isActive !== false,
         displayOrder: displayOrder ?? 0,
       },
-      answers
+      processedAnswers
     );
 
     dbHelpers.createAuditLog({

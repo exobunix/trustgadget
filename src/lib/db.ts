@@ -66,7 +66,7 @@ function getDatabase(): Database.Database {
     } catch (e) {
       try { db.pragma('journal_mode = DELETE'); } catch (_) {}
     }
-    db.pragma('foreign_keys = ON');
+    db.pragma('foreign_keys = OFF');
     initTables(db);
     global.__dbInstance = db;
 
