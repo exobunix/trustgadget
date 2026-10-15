@@ -139,13 +139,36 @@ const VariantSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
+const StatusHistorySubSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  orderId: { type: String },
+  status: { type: String, required: true },
+  note: { type: String },
+  changedBy: { type: String, default: 'System' },
+  createdAt: { type: String, default: () => new Date().toISOString() },
+}, { _id: false });
+
+const VerificationRecordSubSchema = new mongoose.Schema({
+  id: { type: String },
+  orderId: { type: String },
+  verifiedBy: { type: String },
+  declaredCondition: { type: mongoose.Schema.Types.Mixed },
+  verifiedCondition: { type: mongoose.Schema.Types.Mixed },
+  priceDelta: { type: Number, default: 0 },
+  adjustmentsApplied: { type: mongoose.Schema.Types.Mixed },
+  inspectionNotes: { type: String },
+  inspectionPhotos: [{ type: String }],
+  createdAt: { type: String, default: () => new Date().toISOString() },
+  updatedAt: { type: String, default: () => new Date().toISOString() },
+}, { _id: false });
+
 const OrderSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   orderNumber: { type: String, required: true, unique: true },
   userId: { type: String },
   customerName: { type: String, required: true },
   customerPhone: { type: String, required: true },
-  customerEmail: { type: String, required: true },
+  customerEmail: { type: String, default: '' },
   categoryName: { type: String, required: true },
   brandName: { type: String, required: true },
   modelName: { type: String, required: true },
@@ -170,7 +193,16 @@ const OrderSchema = new mongoose.Schema({
   pickupLandmark: { type: String },
   pickupNotes: { type: String },
   assignedAgent: { type: String },
+  verificationNotes: { type: String },
+  cancellationReason: { type: String },
   conditionSummary: { type: mongoose.Schema.Types.Mixed },
+  consentGiven: { type: Number, default: 1 },
+  consentText: { type: String },
+  consentTimestamp: { type: String },
+  consentIp: { type: String },
+  userAgent: { type: String },
+  statusHistory: [StatusHistorySubSchema],
+  verificationRecord: VerificationRecordSubSchema,
 }, { timestamps: true });
 
 const SupportTicketSchema = new mongoose.Schema({

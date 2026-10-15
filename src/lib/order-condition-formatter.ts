@@ -158,8 +158,12 @@ export function resolveOrderConditions(
     if (q.id) qById.set(q.id, q);
   });
 
+  const aByQuestionAndCode = new Map<string, any>();
   const aByCode = new Map<string, any>();
   allAnswers.forEach((a) => {
+    if (a.questionId && a.code) {
+      aByQuestionAndCode.set(`${a.questionId}:${a.code}`, a);
+    }
     if (a.code && !aByCode.has(a.code)) aByCode.set(a.code, a);
     if (a.id && !aByCode.has(a.id)) aByCode.set(a.id, a);
   });
@@ -178,18 +182,26 @@ export function resolveOrderConditions(
       : [String(val)];
 
     const selectedLabels: string[] = codes.map((c) => {
-      // 1. Look up answer in DB
+      // 1. Look up answer in DB for this specific question
+      if (matchedQ) {
+        const specificAns = aByQuestionAndCode.get(`${matchedQ.id}:${c}`);
+        if (specificAns && specificAns.label) {
+          return specificAns.label;
+        }
+      }
+
+      // 2. Look up answer in DB by code
       const matchedAns = aByCode.get(c);
       if (matchedAns && matchedAns.label) {
         return matchedAns.label;
       }
 
-      // 2. Look up in static dictionary
+      // 3. Look up in static dictionary
       if (ANSWER_CODE_LABEL_MAP[c]) {
         return ANSWER_CODE_LABEL_MAP[c];
       }
 
-      // 3. Fallback clean label
+      // 4. Fallback clean label
       return cleanCodeLabel(c);
     });
 

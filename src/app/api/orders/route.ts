@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, dbHelpers } from '@/lib/db';
 import { resolveOrderConditions } from '@/lib/order-condition-formatter';
+import { mongoGetAllOrders, mongoCreateOrder, syncMongoOrdersToSqlite } from '@/lib/mongo-catalog';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -12,6 +13,34 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const limit = parseInt(searchParams.get('limit') || '100', 10);
 
+    // 1. Authoritative fetch from MongoDB Atlas
+    try {
+      const mongoOrders = await mongoGetAllOrders({ userId, status, limit });
+      if (mongoOrders !== null) {
+        const enrichedOrders = mongoOrders.map((ord: any) => ({
+          ...ord,
+          resolvedConditions: resolveOrderConditions(ord.conditionSummary),
+        }));
+
+        // Keep local SQLite warm in background
+        syncMongoOrdersToSqlite(db).catch(() => {});
+
+        return NextResponse.json(
+          { success: true, data: enrichedOrders },
+          {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+            },
+          }
+        );
+      }
+    } catch (mErr) {
+      console.warn('[api/orders] MongoDB query failed, falling back to SQLite:', mErr);
+    }
+
+    // 2. Fallback to local SQLite
     let query = 'SELECT * FROM orders';
     const params: any[] = [];
     const conditions: string[] = [];
@@ -183,19 +212,38 @@ export async function POST(request: NextRequest) {
       userAgent,
     };
 
-    dbHelpers.createOrder(orderData);
+    // 1. Persist to MongoDB Atlas (Persistent source of truth)
+    const initialHistory = {
+      id: `hist_${Date.now()}`,
+      orderId: id,
+      status: 'ORDER_PLACED',
+      note: 'Sell order successfully placed online. Doorstep executive assignment in progress.',
+      changedBy: 'Customer',
+      createdAt: new Date().toISOString(),
+    };
 
-    // Create initial timeline entry
-    db.prepare(`
-      INSERT INTO order_status_history (id, orderId, status, note, changedBy)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(
-      `hist_${Date.now()}`,
-      id,
-      'ORDER_PLACED',
-      'Sell order successfully placed online. Doorstep executive assignment in progress.',
-      'Customer'
-    );
+    try {
+      await mongoCreateOrder(orderData, initialHistory);
+    } catch (mErr) {
+      console.warn('[api/orders] Mongo persist failed:', mErr);
+    }
+
+    // 2. Persist to local SQLite cache
+    try {
+      dbHelpers.createOrder(orderData);
+      db.prepare(`
+        INSERT INTO order_status_history (id, orderId, status, note, changedBy)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        initialHistory.id,
+        id,
+        'ORDER_PLACED',
+        initialHistory.note,
+        'Customer'
+      );
+    } catch (sqlErr) {
+      console.warn('[api/orders] SQLite cache insert error:', sqlErr);
+    }
 
     return NextResponse.json({
       success: true,

@@ -197,3 +197,92 @@ export function isMultiChoiceQuestion(question: any): boolean {
     subtitle.includes('accessories')
   );
 }
+
+/**
+ * Determines whether a specific answer option represents an exclusive "No Defect / Flawless / All Original / None" choice.
+ * When selected in a multi-choice question, it unselects all defect choices.
+ * Conversely, selecting any defect choice unselects this choice.
+ */
+export function isExclusiveNoDefectAnswer(ans: { code?: string; label?: string } | null | undefined): boolean {
+  if (!ans) return false;
+  const label = (ans.label || '').toLowerCase().trim();
+  const code = (ans.code || '').toUpperCase().trim();
+
+  // 1. Explicit no-defect statements take highest precedence
+  const isExplicitNoDefect =
+    label.includes('no physical defect') ||
+    label.includes('no physical damage') ||
+    label.includes('no defect') ||
+    label.includes('no issue') ||
+    label.includes('no problem') ||
+    label.includes('no scratch') ||
+    label.includes('no damage') ||
+    label.includes('none of the') ||
+    label === 'none' ||
+    label.includes('flawless') ||
+    label.includes('works perfectly') ||
+    label.includes('boots up perfectly') ||
+    label.includes('all working') ||
+    label.includes('all original') ||
+    label.includes('all functional') ||
+    label.includes('pristine');
+
+  if (isExplicitNoDefect) {
+    return true;
+  }
+
+  // 2. If the label contains problem/defect keywords, it CAN NEVER be an exclusive no-defect choice
+  const defectWords = [
+    'broken',
+    'cracked',
+    'crack',
+    'scratch',
+    'dent',
+    'bend',
+    'damage',
+    'fault',
+    'issue',
+    'problem',
+    'missing',
+    'not working',
+    'not responding',
+    'cannot',
+    'drain',
+    'line',
+    'spot',
+    'bleed',
+    'replaced',
+    'defective',
+    'dead',
+    'failed',
+    'blur',
+    'locked',
+  ];
+
+  for (const word of defectWords) {
+    if (label.includes(word)) {
+      return false;
+    }
+  }
+
+  // 3. Fallback to code only if label does not describe an option/defect
+  if (
+    code === 'NO_DEFECTS' ||
+    code === 'NO_DEFECT' ||
+    code === 'NONE' ||
+    code === 'ALL_GOOD' ||
+    code === 'ALL_FUNCTIONAL'
+  ) {
+    return true;
+  }
+
+  // If code is PERFECT or FLAWLESS, only consider it no-defect if label is empty or explicitly positive
+  if (code === 'PERFECT' || code === 'FLAWLESS') {
+    if (!label || label.includes('perfect') || label.includes('flawless') || label.includes('good')) {
+      return true;
+    }
+  }
+
+  return false;
+}
+

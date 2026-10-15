@@ -81,6 +81,8 @@ function getDatabase(): Database.Database {
           await mongo.syncMongoQuestionsToSqlite(db);
           await mongo.seedMongoPricingRulesFromSqlite(db);
           await mongo.syncMongoPricingRulesToSqlite(db);
+          await mongo.seedMongoOrdersFromSqlite(db);
+          await mongo.syncMongoOrdersToSqlite(db);
         } catch (e) {
           console.warn('[db] MongoDB sync on init failed (non-fatal):', e);
         }
@@ -526,6 +528,7 @@ function initTables(database: Database.Database) {
   try { database.exec('ALTER TABLE orders ADD COLUMN consentText TEXT'); } catch (e) {}
   try { database.exec('ALTER TABLE orders ADD COLUMN consentTimestamp DATETIME'); } catch (e) {}
   try { database.exec('ALTER TABLE orders ADD COLUMN consentIp TEXT'); } catch (e) {}
+  try { database.exec('ALTER TABLE orders ADD COLUMN userAgent TEXT'); } catch (e) {}
 
   // Synchronize company legal name and contact details across existing databases
   try {

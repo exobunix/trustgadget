@@ -18,6 +18,7 @@ import {
   MongoCategory,
   MongoQuestion,
   MongoPricingRule,
+  MongoOrder,
 } from './mongodb';
 
 // ---------------------------------------------------------------------------
@@ -852,4 +853,281 @@ export async function seedMongoPricingRulesFromSqlite(sqliteDb: any) {
     console.warn('[mongo-catalog] seedMongoPricingRulesFromSqlite error:', e);
   }
 }
+
+// ---------------------------------------------------------------------------
+// ORDERS (Persistent Source of Truth)
+// ---------------------------------------------------------------------------
+
+export async function mongoGetAllOrders(filters: { userId?: string | null; status?: string | null; limit?: number } = {}) {
+  if (!(await ensureMongo())) return null;
+  try {
+    const query: any = {};
+    if (filters.userId) query.userId = filters.userId;
+    if (filters.status && filters.status !== 'ALL') query.status = filters.status;
+
+    const limit = Math.min(filters.limit || 100, 200);
+    const orders = await MongoOrder.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    return orders.map((o: any) => ({
+      ...o,
+      _id: o._id ? String(o._id) : undefined,
+    }));
+  } catch (e) {
+    console.warn('[mongo-catalog] mongoGetAllOrders error:', e);
+    return null;
+  }
+}
+
+export async function mongoGetOrderById(idOrOrderNumber: string) {
+  if (!(await ensureMongo())) return null;
+  try {
+    const order = await MongoOrder.findOne({
+      $or: [{ id: idOrOrderNumber }, { orderNumber: idOrOrderNumber }],
+    }).lean();
+
+    if (!order) return null;
+    return {
+      ...order,
+      _id: (order as any)._id ? String((order as any)._id) : undefined,
+    };
+  } catch (e) {
+    console.warn('[mongo-catalog] mongoGetOrderById error:', e);
+    return null;
+  }
+}
+
+export async function mongoCreateOrder(orderData: any, initialHistory?: any) {
+  if (!(await ensureMongo())) return false;
+  try {
+    const doc: any = { ...orderData };
+    if (initialHistory) {
+      doc.statusHistory = [initialHistory];
+    }
+    await MongoOrder.findOneAndUpdate(
+      { id: orderData.id },
+      { $set: doc },
+      { upsert: true, new: true }
+    );
+    return true;
+  } catch (e) {
+    console.warn('[mongo-catalog] mongoCreateOrder error:', e);
+    return false;
+  }
+}
+
+export async function mongoUpdateOrder(
+  idOrOrderNumber: string,
+  updateFields: any,
+  historyItem?: any,
+  verificationData?: any
+) {
+  if (!(await ensureMongo())) return false;
+  try {
+    const updateOps: any = {};
+    const cleanFields: any = {};
+    for (const [k, v] of Object.entries(updateFields)) {
+      if (v !== undefined) cleanFields[k] = v;
+    }
+    cleanFields.updatedAt = new Date().toISOString();
+
+    if (verificationData) {
+      cleanFields.verificationRecord = verificationData;
+    }
+
+    updateOps.$set = cleanFields;
+
+    if (historyItem) {
+      updateOps.$push = { statusHistory: historyItem };
+    }
+
+    await MongoOrder.findOneAndUpdate(
+      { $or: [{ id: idOrOrderNumber }, { orderNumber: idOrOrderNumber }] },
+      updateOps,
+      { new: true }
+    );
+    return true;
+  } catch (e) {
+    console.warn('[mongo-catalog] mongoUpdateOrder error:', e);
+    return false;
+  }
+}
+
+export async function mongoTrackOrder(queryStr: string) {
+  if (!(await ensureMongo())) return null;
+  try {
+    const clean = queryStr.trim();
+    const regex = new RegExp(clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    const order = await MongoOrder.findOne({
+      $or: [{ orderNumber: clean }, { id: clean }, { customerPhone: regex }],
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!order) return null;
+    return {
+      ...order,
+      _id: (order as any)._id ? String((order as any)._id) : undefined,
+    };
+  } catch (e) {
+    console.warn('[mongo-catalog] mongoTrackOrder error:', e);
+    return null;
+  }
+}
+
+export async function seedMongoOrdersFromSqlite(sqliteDb: any) {
+  if (!(await ensureMongo())) return;
+  try {
+    const existingCount = await MongoOrder.countDocuments();
+    if (existingCount > 0) return;
+
+    const orders = sqliteDb.prepare('SELECT * FROM orders').all() as any[];
+    if (!orders || orders.length === 0) return;
+
+    for (const ord of orders) {
+      let history: any[] = [];
+      try {
+        history = sqliteDb.prepare('SELECT * FROM order_status_history WHERE orderId = ? ORDER BY createdAt ASC').all(ord.id);
+      } catch (e) {}
+
+      let verification: any = null;
+      try {
+        verification = sqliteDb.prepare('SELECT * FROM verification_records WHERE orderId = ?').get(ord.id);
+      } catch (e) {}
+
+      let parsedCondition: any = null;
+      try {
+        parsedCondition = ord.conditionSummary ? JSON.parse(ord.conditionSummary) : null;
+      } catch {
+        parsedCondition = ord.conditionSummary;
+      }
+
+      await MongoOrder.findOneAndUpdate(
+        { id: ord.id },
+        {
+          $setOnInsert: {
+            ...ord,
+            conditionSummary: parsedCondition,
+            statusHistory: history,
+            verificationRecord: verification,
+          },
+        },
+        { upsert: true }
+      );
+    }
+    console.log(`[mongo-catalog] Seeded ${orders.length} orders from SQLite → MongoDB`);
+  } catch (e) {
+    console.warn('[mongo-catalog] seedMongoOrdersFromSqlite error:', e);
+  }
+}
+
+export async function syncMongoOrdersToSqlite(sqliteDb: any) {
+  if (!(await ensureMongo())) return;
+  try {
+    const mongoOrders = (await MongoOrder.find({}).sort({ createdAt: -1 }).limit(100).lean()) as any[];
+    if (!mongoOrders || mongoOrders.length === 0) return;
+
+    const upsertOrder = sqliteDb.prepare(`
+      INSERT OR REPLACE INTO orders (
+        id, orderNumber, userId, customerName, customerPhone, customerEmail,
+        categoryName, brandName, modelName, variantName, deviceImageUrl,
+        basePrice, estimatedPrice, finalVerifiedPrice, status, paymentStatus,
+        payoutMethod, payoutUpiId, payoutBankAccount, payoutBankIfsc, payoutBankName,
+        pickupDate, pickupTimeSlot, pickupAddress, pickupCity, pickupState,
+        pickupPincode, pickupLandmark, pickupNotes, conditionSummary,
+        assignedAgent, verificationNotes, cancellationReason,
+        consentGiven, consentText, consentTimestamp, consentIp, userAgent,
+        createdAt, updatedAt
+      ) VALUES (
+        @id, @orderNumber, @userId, @customerName, @customerPhone, @customerEmail,
+        @categoryName, @brandName, @modelName, @variantName, @deviceImageUrl,
+        @basePrice, @estimatedPrice, @finalVerifiedPrice, @status, @paymentStatus,
+        @payoutMethod, @payoutUpiId, @payoutBankAccount, @payoutBankIfsc, @payoutBankName,
+        @pickupDate, @pickupTimeSlot, @pickupAddress, @pickupCity, @pickupState,
+        @pickupPincode, @pickupLandmark, @pickupNotes, @conditionSummary,
+        @assignedAgent, @verificationNotes, @cancellationReason,
+        @consentGiven, @consentText, @consentTimestamp, @consentIp, @userAgent,
+        @createdAt, @updatedAt
+      )
+    `);
+
+    const upsertHist = sqliteDb.prepare(`
+      INSERT OR REPLACE INTO order_status_history (id, orderId, status, note, changedBy, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    const tx = sqliteDb.transaction(() => {
+      for (const ord of mongoOrders) {
+        const condSummaryStr =
+          typeof ord.conditionSummary === 'object'
+            ? JSON.stringify(ord.conditionSummary)
+            : ord.conditionSummary || null;
+
+        upsertOrder.run({
+          id: ord.id,
+          orderNumber: ord.orderNumber,
+          userId: ord.userId || null,
+          customerName: ord.customerName,
+          customerPhone: ord.customerPhone,
+          customerEmail: ord.customerEmail || '',
+          categoryName: ord.categoryName,
+          brandName: ord.brandName,
+          modelName: ord.modelName,
+          variantName: ord.variantName,
+          deviceImageUrl: ord.deviceImageUrl || null,
+          basePrice: Number(ord.basePrice) || 0,
+          estimatedPrice: Number(ord.estimatedPrice) || 0,
+          finalVerifiedPrice: ord.finalVerifiedPrice != null ? Number(ord.finalVerifiedPrice) : null,
+          status: ord.status || 'ORDER_PLACED',
+          paymentStatus: ord.paymentStatus || 'PENDING',
+          payoutMethod: ord.payoutMethod || 'UPI',
+          payoutUpiId: ord.payoutUpiId || null,
+          payoutBankAccount: ord.payoutBankAccount || null,
+          payoutBankIfsc: ord.payoutBankIfsc || null,
+          payoutBankName: ord.payoutBankName || null,
+          pickupDate: ord.pickupDate,
+          pickupTimeSlot: ord.pickupTimeSlot,
+          pickupAddress: ord.pickupAddress,
+          pickupCity: ord.pickupCity || 'City',
+          pickupState: ord.pickupState || 'State',
+          pickupPincode: ord.pickupPincode,
+          pickupLandmark: ord.pickupLandmark || null,
+          pickupNotes: ord.pickupNotes || null,
+          conditionSummary: condSummaryStr,
+          assignedAgent: ord.assignedAgent || null,
+          verificationNotes: ord.verificationNotes || null,
+          cancellationReason: ord.cancellationReason || null,
+          consentGiven: ord.consentGiven != null ? Number(ord.consentGiven) : 1,
+          consentText: ord.consentText || null,
+          consentTimestamp: ord.consentTimestamp || null,
+          consentIp: ord.consentIp || null,
+          userAgent: ord.userAgent || null,
+          createdAt: ord.createdAt ? new Date(ord.createdAt).toISOString() : new Date().toISOString(),
+          updatedAt: ord.updatedAt ? new Date(ord.updatedAt).toISOString() : new Date().toISOString(),
+        });
+
+        if (Array.isArray(ord.statusHistory)) {
+          for (const h of ord.statusHistory) {
+            upsertHist.run(
+              h.id || `hist_${Date.now()}`,
+              ord.id,
+              h.status || 'ORDER_PLACED',
+              h.note || '',
+              h.changedBy || 'System',
+              h.createdAt ? new Date(h.createdAt).toISOString() : new Date().toISOString()
+            );
+          }
+        }
+      }
+    });
+
+    tx();
+    console.log(`[mongo-catalog] Synced ${mongoOrders.length} orders from MongoDB → SQLite`);
+  } catch (e) {
+    console.warn('[mongo-catalog] syncMongoOrdersToSqlite error:', e);
+  }
+}
+
 

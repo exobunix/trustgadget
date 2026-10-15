@@ -14,7 +14,7 @@ import {
   Smartphone,
   Laptop,
 } from 'lucide-react';
-import { isMultiChoiceQuestion } from '@/lib/question-targeting';
+import { isMultiChoiceQuestion, isExclusiveNoDefectAnswer } from '@/lib/question-targeting';
 
 export default function ModelValuationPage() {
   const params = useParams();
@@ -79,13 +79,7 @@ export default function ModelValuationPage() {
         return { ...prev, [q.code]: [ans.code] };
       }
 
-      const isNoDefect =
-        ans.code === 'PERFECT' ||
-        ans.code === 'FLAWLESS' ||
-        ans.code === 'NO_DEFECTS' ||
-        ans.label.toLowerCase().includes('no physical defects') ||
-        ans.label.toLowerCase().includes('no defects') ||
-        ans.label.toLowerCase().includes('flawless');
+      const isNoDefect = isExclusiveNoDefectAnswer(ans);
 
       if (isNoDefect) {
         if (current.includes(ans.code)) {
@@ -96,14 +90,7 @@ export default function ModelValuationPage() {
       } else {
         const filteredCurrent = current.filter((c) => {
           const matchAns = q.answers?.find((a: any) => a.code === c);
-          const isAnsNoDefect =
-            c === 'PERFECT' ||
-            c === 'FLAWLESS' ||
-            c === 'NO_DEFECTS' ||
-            matchAns?.label?.toLowerCase().includes('no physical defects') ||
-            matchAns?.label?.toLowerCase().includes('no defects') ||
-            matchAns?.label?.toLowerCase().includes('flawless');
-          return !isAnsNoDefect;
+          return !isExclusiveNoDefectAnswer(matchAns || { code: c });
         });
 
         if (filteredCurrent.includes(ans.code)) {

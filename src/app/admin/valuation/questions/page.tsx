@@ -28,8 +28,8 @@ export default function AdminQuestionsPage() {
   const [targetCategory, setTargetCategory] = useState('SMARTPHONE');
   const [questionType, setQuestionType] = useState('SINGLE_CHOICE');
   const [answersList, setAnswersList] = useState([
-    { code: 'PERFECT', label: 'Flawless Condition', adjustmentValue: 0, adjustmentType: 'FIXED' },
-    { code: 'DAMAGED', label: 'Minor Defect', adjustmentValue: -1500, adjustmentType: 'FIXED' },
+    { code: 'OPT_1', label: 'Option 1', adjustmentValue: 0, adjustmentType: 'FIXED' },
+    { code: 'OPT_2', label: 'Option 2', adjustmentValue: 0, adjustmentType: 'FIXED' },
   ]);
   const [submitting, setSubmitting] = useState(false);
 
