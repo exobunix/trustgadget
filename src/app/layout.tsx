@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   title: 'TrustGadgetMart | Your Tech Destination - Instant Device Resale',
   description: 'Turn your old smartphone or laptop into instant cash with TrustGadgetMart. Get transparent algorithmic quotes, free doorstep pickup, and instant UPI payout across 19,000+ Indian pincodes.',
   keywords: 'trustgadgetmart, trust gadget mart, sell old phone, sell laptop, cash for phones, device resale india, used iphone price, sell macbook, sell used mobile',
+  verification: {
+    google: 'VEPxig6YALU6yERqUE6AV3t_UfygNjKOf2fRnfKF0qI',
+  },
 };
 
 export default function RootLayout({
@@ -31,6 +34,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
+        <meta name="google-site-verification" content="VEPxig6YALU6yERqUE6AV3t_UfygNjKOf2fRnfKF0qI" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
